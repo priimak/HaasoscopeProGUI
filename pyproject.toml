@@ -1,0 +1,32 @@
+[project]
+name = "HaasoscopeProGUI"
+dynamic = ["version"]
+description = "GUI for Haasoscope Pro"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pyside6==6.8.0.2",
+    "pyqtgraph",
+    "returns==0.24.0",
+    "polars==1.14.0",
+    "matplotlib==3.10.0",
+    "scipy==1.15.1",
+    "pytide6 @ git+https://github.com/priimak/PyTide6.git@v0.5.0",
+    "HaasoscopeProPy @ git+https://github.com/priimak/HaasoscopeProPy.git@master"
+]
+
+[build-system]
+requires = ["setuptools", "wheel", "setuptools-git-versioning"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools-git-versioning]
+enabled = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["*.png"]
+
+[project.scripts]
+hspro = "hspro.gui.main:main"
