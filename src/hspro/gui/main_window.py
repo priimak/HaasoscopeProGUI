@@ -1,8 +1,10 @@
 import math
 
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QScrollArea
 from pyqtgraph import PlotWidget
 from pyqtgraph.graphicsItems import PlotDataItem
-from pytide6 import MainWindow, set_geometry, VBoxPanel, W, HBoxPanel
+from pytide6 import MainWindow, set_geometry, VBoxPanel, W, HBoxPanel, Label
 from sprats.config import AppPersistence
 
 from hspro.gui.app import App
@@ -40,12 +42,21 @@ class HSProMainWindow(MainWindow):
         print(pp.name())
         # self.plot.addItem(plot_item)
 
-        top_controls_panel = HBoxPanel([ChannelsPanel(self.app), TriggerPanel(self.app)], margins=0)
+        right_panel = VBoxPanel(
+            widgets=[
+                TriggerPanel(self.app), W(Label(""), stretch=10)
+                # TriggerPanel(self.app), GeneralOptionsPanel(self.app), W(Label(""), stretch=10)
+            ],
+            margins=0
+        )
+        channels_area = QScrollArea()
+        channels_area.setWidget(ChannelsPanel(self.app))
+        channels_area.setMinimumWidth(ChannelsPanel.min_width + 15)
+        channels_area.setWidgetResizable(True)
+        channels_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        channels_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        top_controls_panel = HBoxPanel([channels_area, right_panel], margins=0)
         controls_panel = VBoxPanel([top_controls_panel], margins=0)
-        # controls_panel.setAutoFillBackground(True)
-        # palette = QPalette()
-        # palette.setColor(QPalette.ColorRole.Window, "lightblue")
-        # controls_panel.setPalette(palette)
 
         main_panel = HBoxPanel(widgets=[
             W(self.plot, stretch=1), controls_panel

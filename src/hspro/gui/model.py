@@ -21,7 +21,7 @@ class TriggerTypeModel(Enum):
 
     @staticmethod
     def to_str(value: "TriggerTypeModel") -> str:
-        return value.name
+        return value.value
 
 
 class ChannelCouplingModel(Enum):
@@ -235,6 +235,9 @@ class TriggerModel(ModelBase):
 
 
 class BoardModel(ModelBase):
+    VALID_DOWNSAMPLEMERGIN_VALUES_ONE_CHANNEL = [1, 2, 4, 8, 20, 40]
+    VALID_DOWNSAMPLEMERGIN_VALUES_TWO_CHANNELS = [1, 2, 4, 10, 20]
+
     def __init__(self, persistence: AppPersistence):
         super().__init__(persistence)
         self.channel = [ChannelModel(1, persistence), ChannelModel(2, persistence)]
@@ -258,3 +261,16 @@ class BoardModel(ModelBase):
     @mem_depth.setter
     def mem_depth(self, value: int):
         self.__mem_depth.value = self.__mem_depth.setter(value)
+
+    # def get_valid_time_scales(self) -> list[Duration]:
+    #     """
+    #     Returns list of valid durations for horizontal division. This is intended to be used
+    #     in GUI to construct valid time base element.
+    #     """
+    #     num_samples_per_division = self.state.samples_per_row_per_waveform() * self.state.expect_samples / 10
+    #     results = []
+    #     for downsample in range(32):
+    #         for downsamplemerging in self.__get_valid_downsamplemergin_values():
+    #             dt_s = BoardConsts.NATIVE_SAMPLE_PERIOD_S * downsamplemerging * pow(2, downsample)
+    #             results.append(Duration.value_of(f"{dt_s * num_samples_per_division} s").optimize())
+    #     return results

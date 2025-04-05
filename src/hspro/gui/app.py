@@ -1,5 +1,7 @@
+from functools import cache
 from typing import Callable
 
+from PySide6.QtGui import QPalette
 from pytide6 import MainWindow
 from sprats.config import AppPersistence
 
@@ -23,3 +25,9 @@ class App:
             plot_color_scheme = "light"
             self.app_persistence.config.set_value("plot_color_scheme", plot_color_scheme)
         self.set_plot_color_scheme(plot_color_scheme)
+
+    @cache
+    def side_pannels_palette(self):
+        palette = QPalette()
+        palette.setColor(QPalette.ColorRole.Window, "lightblue")
+        return palette

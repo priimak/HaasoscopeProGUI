@@ -38,6 +38,8 @@ class VoltageOffsetSpinner(QDoubleSpinBox):
 
 
 class ChannelsPanel(VBoxPanel):
+    min_width = 230
+
     def __init__(self, app: App):
         super().__init__(margins=0)
         self.app = app
@@ -45,7 +47,9 @@ class ChannelsPanel(VBoxPanel):
         for channel in app.channels:
             channel_name = f"Ch #{channel + 1}"
 
-            channel_color_selector = Label("")
+            channel_color_selector = Label(" ")
+            channel_color_selector.setMinimumWidth(100)
+            channel_color_selector.setMaximumWidth(100)
 
             def mk_color_selector(color_selector: Label):
                 def select_color(ev: QMouseEvent):
@@ -69,11 +73,8 @@ class ChannelsPanel(VBoxPanel):
 
             vdiv = VperDivSpinner(channel, app)
             voffset = VoltageOffsetSpinner(channel, app)
-            channel_panel = VBoxPanel(widgets=[
-                HBoxPanel([Label(channel_name), channel_color_selector], margins=0),
-                CheckBox(
-                    "Active", on_change=self.channel_active_callback(channel), checked=app.model.channel[channel].active
-                ),
+
+            channel_config_panel = VBoxPanel(widgets=[
                 HBoxPanel(widgets=[vdiv, W(Label("V/div (Scale)"), stretch=10)], margins=0),
                 HBoxPanel(widgets=[voffset, W(Label("V (Offset)"), stretch=10)], margins=0),
                 HBoxPanel(
@@ -113,6 +114,20 @@ class ChannelsPanel(VBoxPanel):
                     W(Label("5x attenuation"), stretch=10, alignment=Qt.AlignmentFlag.AlignLeft)
                 ], margins=(0, 5, 0, 0)),
             ])
+
+            channel_panel = VBoxPanel(widgets=[
+                HBoxPanel([Label(channel_name), channel_color_selector], margins=0),
+                CheckBox(
+                    "Active",
+                    on_change=self.channel_active_callback(channel, channel_config_panel),
+                    checked=app.model.channel[channel].active
+                ),
+                channel_config_panel]
+            )
+            if not app.model.channel[channel].active:
+                channel_config_panel.setVisible(False)
+            channel_panel.setMinimumWidth(ChannelsPanel.min_width)
+
             channel_panel.setObjectName("ChannelPanel")
             channel_panel.setAutoFillBackground(True)
             palette = QPalette()
@@ -122,9 +137,10 @@ class ChannelsPanel(VBoxPanel):
 
         self.layout().addStretch(10)
 
-    def channel_active_callback(self, channel: int) -> Callable[[bool], None]:
+    def channel_active_callback(self, channel: int, channel_config_panel: VBoxPanel) -> Callable[[bool], None]:
         def channel_active(active: bool):
             self.app.model.channel[channel].active = active
+            channel_config_panel.setVisible(active)
 
         return channel_active
 

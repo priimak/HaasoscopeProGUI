@@ -1,7 +1,9 @@
-from PyQt5.QtWidgets import QDoubleSpinBox
+# from PyQt5.QtWidgets import QDoubleSpinBox
+from PySide6.QtWidgets import QDoubleSpinBox
 from pytide6 import VBoxPanel, HBoxPanel
 
 from hspro.gui.app import App
+
 
 class TimeScaleSpinner(QDoubleSpinBox):
     def __init__(self, app: App):
@@ -10,14 +12,18 @@ class TimeScaleSpinner(QDoubleSpinBox):
         # self.setDecimals(4)
         # self.setValue(app.model.channel[channel].dV)
 
-    def stepBy(self, steps):
-        new_val = self.value() * (1.0 + steps * 0.1)
-        self.app.model.channel[self.channel].dV = new_val
-        self.setValue(new_val)
+    # def stepBy(self, steps):
+    #     new_val = self.value() * (1.0 + steps * 0.1)
+    #     self.app.model.channel[self.channel].dV = new_val
+    #     self.setValue(new_val)
+
 
 class GeneralOptionsPanel(VBoxPanel):
     def __init__(self, app: App):
-        super().__init__(margins=0)
+        super().__init__()
         self.app = app
 
-        self.layout().addWidget(HBoxPanel([], margins=0))
+        self.layout().addWidget(HBoxPanel([TimeScaleSpinner(app)], margins=0))
+
+        self.setAutoFillBackground(True)
+        self.setPalette(app.side_pannels_palette())

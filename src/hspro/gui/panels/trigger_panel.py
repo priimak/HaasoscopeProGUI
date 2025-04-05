@@ -1,4 +1,4 @@
-from PySide6.QtGui import QPalette, Qt
+from PySide6.QtGui import Qt
 from PySide6.QtWidgets import QSpinBox, QSpacerItem, QSlider
 from pytide6 import VBoxPanel, VBoxLayout, PushButton, Label, HBoxPanel, ComboBox, W
 
@@ -108,9 +108,7 @@ class TriggerPanel(VBoxPanel):
         layout.addStretch(10)
 
         self.setAutoFillBackground(True)
-        palette = QPalette()
-        palette.setColor(QPalette.ColorRole.Window, "lightblue")
-        self.setPalette(palette)
+        self.setPalette(self.app.side_pannels_palette())
 
     def set_button_active_appearance(self, button: PushButton) -> None:
         for b in [self.stop_button, self.single_button, self.normal_button, self.auto_button, self.external_button]:
