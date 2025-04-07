@@ -1,8 +1,17 @@
 from dataclasses import dataclass
 from enum import Enum
+from functools import cache
 from typing import Type, Callable
 
 from sprats.config import AppPersistence
+from unlib import Duration
+
+
+@dataclass
+class TimeScale:
+    dT_per_division: Duration
+    downsamplemerging: int
+    downsample: int
 
 
 class TriggerTypeModel(Enum):
@@ -92,8 +101,10 @@ class ModelBase:
 
 
 class ChannelModel(ModelBase):
-    def __init__(self, channel_num: int, persistence: AppPersistence):
+    def __init__(self, parent, channel_num: int, persistence: AppPersistence):
         super().__init__(persistence)
+        self.parent: BoardModel = parent
+
         self.__active = self.get(f"/channels/{channel_num}/active", bool)
         self.__color = self.get(f"/channels/{channel_num}/color", str)
         self.__offset_V = self.get(f"/channels/{channel_num}/offset_V", float)
@@ -113,7 +124,9 @@ class ChannelModel(ModelBase):
 
     @active.setter
     def active(self, value: bool):
-        self.__active.value = self.__active.setter(value)
+        if self.__active.value != value:
+            self.__active.value = self.__active.setter(value)
+            self.parent.on_channel_active_change()
 
     @property
     def color(self) -> str:
@@ -235,16 +248,23 @@ class TriggerModel(ModelBase):
 
 
 class BoardModel(ModelBase):
+    # TODO: Remove these constants and reuse them from HaasoscopeProPy
     VALID_DOWNSAMPLEMERGIN_VALUES_ONE_CHANNEL = [1, 2, 4, 8, 20, 40]
     VALID_DOWNSAMPLEMERGIN_VALUES_TWO_CHANNELS = [1, 2, 4, 10, 20]
+    NATIVE_SAMPLE_PERIOD_S = 3.125e-10
 
     def __init__(self, persistence: AppPersistence):
         super().__init__(persistence)
-        self.channel = [ChannelModel(1, persistence), ChannelModel(2, persistence)]
+        self.channel = [ChannelModel(self, 1, persistence), ChannelModel(self, 2, persistence)]
         self.trigger = TriggerModel(persistence)
 
         self.__highres = self.get(f"/general/highres", bool)
         self.__mem_depth = self.get(f"/general/mem_depth", int)
+        self.__delay = self.get(f"/general/delay", int)
+        self.__f_delay = self.get(f"/general/f_delay", int)
+
+        self.on_memdepth_change: Callable[[], None] = lambda: None
+        self.on_channel_active_change: Callable[[], None] = lambda: None
 
     @property
     def highres(self) -> bool:
@@ -260,17 +280,81 @@ class BoardModel(ModelBase):
 
     @mem_depth.setter
     def mem_depth(self, value: int):
-        self.__mem_depth.value = self.__mem_depth.setter(value)
+        if self.mem_depth != value:
+            self.__mem_depth.value = self.__mem_depth.setter(value)
+            self.on_memdepth_change()
 
-    # def get_valid_time_scales(self) -> list[Duration]:
-    #     """
-    #     Returns list of valid durations for horizontal division. This is intended to be used
-    #     in GUI to construct valid time base element.
-    #     """
-    #     num_samples_per_division = self.state.samples_per_row_per_waveform() * self.state.expect_samples / 10
-    #     results = []
-    #     for downsample in range(32):
-    #         for downsamplemerging in self.__get_valid_downsamplemergin_values():
-    #             dt_s = BoardConsts.NATIVE_SAMPLE_PERIOD_S * downsamplemerging * pow(2, downsample)
-    #             results.append(Duration.value_of(f"{dt_s * num_samples_per_division} s").optimize())
-    #     return results
+    @property
+    def delay(self) -> int:
+        return self.__delay.value
+
+    @delay.setter
+    def delay(self, value: int):
+        self.__delay.value = self.__delay.setter(value)
+
+    @property
+    def f_delay(self) -> int:
+        return self.__f_delay.value
+
+    @f_delay.setter
+    def f_delay(self, value: int):
+        self.__f_delay.value = self.__f_delay.setter(value)
+
+    @cache
+    def get_next_valid_time_scale(
+            self,
+            two_channel_operation: int,
+            mem_depth: int,
+            current_value: Duration,
+            index_offset: int
+    ) -> Duration:
+        valid_values: list[Duration] = self.get_valid_time_scales(two_channel_operation, mem_depth)
+
+        def current_index():
+            for i, d in enumerate(valid_values):
+                if d >= current_value:
+                    return i
+            return 0
+
+        current_index = current_index()
+        next_index = min(max(current_index + index_offset, 0), len(valid_values) - 1)
+        return valid_values[next_index]
+
+    @cache
+    def get_valid_time_scales(self, two_channel_operation: int, mem_depth: int) -> list[Duration]:
+        """
+        Returns list of valid durations for horizontal division. This is intended to be used
+        in GUI to construct valid time base element.
+        """
+        samples_per_row_per_waveform = 20 if two_channel_operation else 40
+        num_samples_per_division = samples_per_row_per_waveform * mem_depth / 10
+
+        def get_valid_downsamplemergin_values():
+            if two_channel_operation:
+                return BoardModel.VALID_DOWNSAMPLEMERGIN_VALUES_TWO_CHANNELS
+            else:
+                return BoardModel.VALID_DOWNSAMPLEMERGIN_VALUES_ONE_CHANNEL
+
+        valid_downsamplemergin_values = get_valid_downsamplemergin_values()
+
+        results = []
+        for downsample in range(32):
+            for downsamplemerging in valid_downsamplemergin_values:
+                dt_s = BoardModel.NATIVE_SAMPLE_PERIOD_S * downsamplemerging * pow(2, downsample)
+                results.append(Duration.value_of(f"{dt_s * num_samples_per_division} s").optimize())
+        results = list(set(results))
+        results.sort()
+        return results
+
+    @cache
+    def get_time_scale_from_board_parameters(
+            self,
+            two_channel_operation: int,
+            mem_depth: int,
+            downsample: int,
+            downsamplemerging: int
+    ) -> Duration:
+        samples_per_row_per_waveform = 20 if two_channel_operation else 40
+        num_samples_per_division = samples_per_row_per_waveform * mem_depth / 10
+        dt_s = BoardModel.NATIVE_SAMPLE_PERIOD_S * downsamplemerging * pow(2, downsample)
+        return Duration.value_of(f"{dt_s * num_samples_per_division} s").optimize()

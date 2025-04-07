@@ -54,6 +54,7 @@ class TriggerPanel(VBoxPanel):
         self.trigger_level.setMaximum(255)
         self.trigger_level.setSliderPosition(255 * (app.model.trigger.level + 1) / 2)
         self.trigger_level.valueChanged.connect(self.trigger_level_callback)
+        self.app.set_trigger_level_from_plot_line = self.set_trigger_level_from_plot_line
         trig_level_panel = VBoxPanel([Label("Trig Level"), HBoxPanel([self.trigger_level], margins=0)], margins=0)
         layout.addWidget(HBoxPanel([main_panel, trig_level_panel], margins=0))
 
@@ -103,6 +104,7 @@ class TriggerPanel(VBoxPanel):
         self.trigger_position.setMaximum(999)
         self.trigger_position.setSliderPosition(int(app.model.trigger.position * 999))
         self.trigger_position.valueChanged.connect(self.trigger_position_callback)
+        self.app.set_trigger_pos_from_plot_line = self.set_trigger_pos_from_plot_line
         layout.addWidget(self.trigger_position)
 
         layout.addStretch(10)
@@ -131,6 +133,20 @@ class TriggerPanel(VBoxPanel):
 
     def trigger_position_callback(self):
         self.app.model.trigger.position = self.trigger_position.value() / 999.0
+        self.app.set_trigger_pos_from_side_controls(self.app.model.trigger.position)
 
     def trigger_level_callback(self):
         self.app.model.trigger.level = self.trigger_level.value() * 2 / 255 - 1
+        self.app.set_trigger_level_from_side_controls(self.app.model.trigger.level)
+
+    def set_trigger_level_from_plot_line(self, value):
+        value = value / 5
+        if value != self.app.model.trigger.level:
+            self.app.model.trigger.level = value
+            self.trigger_level.setSliderPosition(255 * (self.app.model.trigger.level + 1) / 2)
+
+    def set_trigger_pos_from_plot_line(self, value):
+        value = value / 10
+        if value != self.app.model.trigger.position:
+            self.app.model.trigger.position = value
+            self.trigger_position.setSliderPosition(int(value * 999))

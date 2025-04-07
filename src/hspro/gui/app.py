@@ -1,7 +1,7 @@
 from functools import cache
 from typing import Callable
 
-from PySide6.QtGui import QPalette
+from PySide6.QtGui import QPalette, QPen, Qt
 from pytide6 import MainWindow
 from sprats.config import AppPersistence
 
@@ -16,8 +16,14 @@ class App:
     set_connection_status_label: Callable[[str], None] = lambda _: None
     set_plot_color_scheme: Callable[[str], None] = lambda _: None
     channels: list[int] = [0, 1]
-
-    # trigger_
+    set_trigger_level_from_side_controls: Callable[[float], None] = lambda _: None
+    set_trigger_level_from_plot_line: Callable[[float], None] = lambda _: None
+    set_trigger_pos_from_side_controls: Callable[[float], None] = lambda _: None
+    set_trigger_pos_from_plot_line: Callable[[float], None] = lambda _: None
+    set_channel_active_state: Callable[[int, bool], None] = lambda a, b: None
+    set_channel_color: Callable[[int, str], None] = lambda a, b: None
+    set_show_grid_state: Callable[[bool], None] = lambda _: None
+    set_show_zero_line_state: Callable[[bool], None] = lambda _: None
 
     def init(self):
         plot_color_scheme: str | None = self.app_persistence.config.get_value("plot_color_scheme", str)
@@ -31,3 +37,13 @@ class App:
         palette = QPalette()
         palette.setColor(QPalette.ColorRole.Window, "lightblue")
         return palette
+
+    @cache
+    def trigger_lines_pen_default(self) -> QPen:
+        pen = QPen()
+        pen.setCosmetic(True)
+        pen.setColor("#0000FF")
+        pen.setWidth(2)
+        pen.setStyle(Qt.PenStyle.CustomDashLine)
+        pen.setDashPattern([4, 4])
+        return pen

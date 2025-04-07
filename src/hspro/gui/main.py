@@ -60,6 +60,18 @@ def main():
         }
     )
 
+    if persistence.config.get_by_xpath("/general/downsamplemerging", int) is None:
+        persistence.config.set_by_xpath("/general/downsamplemerging", 1)
+
+    if persistence.config.get_by_xpath("/general/downsample", int) is None:
+        persistence.config.set_by_xpath("/general/downsample", 0)
+
+    if persistence.config.get_by_xpath("/general/delay", int) is None:
+        persistence.config.set_by_xpath("/general/delay", 0)
+
+    if persistence.config.get_by_xpath("/general/f_delay", int) is None:
+        persistence.config.set_by_xpath("/general/f_delay", 0)
+
     win = HSProMainWindow(screen_dim=(screen_width, screen_height), app_persistence=persistence)
     win.show()
     win.activateWindow()

@@ -62,6 +62,7 @@ class ChannelsPanel(VBoxPanel):
                         )
                         color_selector.color = new_color
                         app.model.channel[color_selector.channel].color = new_color
+                        app.set_channel_color(color_selector.channel, new_color)
 
                 return select_color
 
@@ -107,12 +108,12 @@ class ChannelsPanel(VBoxPanel):
                     CheckBox(on_change=self.ten_x_callback(channel), checked=app.model.channel[channel].ten_x_probe),
                     W(Label("10x probe"), stretch=10, alignment=Qt.AlignmentFlag.AlignLeft)
                 ], margins=(0, 5, 0, 0)),
-                HBoxPanel(widgets=[
-                    CheckBox(
-                        on_change=self.five_x_callback(channel), checked=app.model.channel[channel].five_x_attenuation
-                    ),
-                    W(Label("5x attenuation"), stretch=10, alignment=Qt.AlignmentFlag.AlignLeft)
-                ], margins=(0, 5, 0, 0)),
+                # HBoxPanel(widgets=[
+                #     CheckBox(
+                #         on_change=self.five_x_callback(channel), checked=app.model.channel[channel].five_x_attenuation
+                #     ),
+                #     W(Label("5x attenuation"), stretch=10, alignment=Qt.AlignmentFlag.AlignLeft)
+                # ], margins=(0, 5, 0, 0)),
             ])
 
             channel_panel = VBoxPanel(widgets=[
@@ -141,6 +142,7 @@ class ChannelsPanel(VBoxPanel):
         def channel_active(active: bool):
             self.app.model.channel[channel].active = active
             channel_config_panel.setVisible(active)
+            self.app.set_channel_active_state(channel, active)
 
         return channel_active
 
