@@ -24,6 +24,7 @@ class App:
     set_channel_color: Callable[[int, str], None] = lambda a, b: None
     set_show_grid_state: Callable[[bool], None] = lambda _: None
     set_show_zero_line_state: Callable[[bool], None] = lambda _: None
+    set_trigger_level_line_visible: Callable[[bool], None] = lambda _: None
 
     def init(self):
         plot_color_scheme: str | None = self.app_persistence.config.get_value("plot_color_scheme", str)

@@ -1,5 +1,5 @@
 from PySide6.QtGui import Qt
-from PySide6.QtWidgets import QSpinBox, QSpacerItem, QSlider
+from PySide6.QtWidgets import QSpinBox, QSpacerItem, QSlider, QLabel
 from pytide6 import VBoxPanel, VBoxLayout, PushButton, Label, HBoxPanel, ComboBox, W
 
 from hspro.gui.app import App
@@ -17,7 +17,6 @@ class TriggerPanel(VBoxPanel):
         self.single_button = PushButton("Single")
         self.normal_button = PushButton("Normal")
         self.auto_button = PushButton("Auto")
-        self.external_button = PushButton("  External  ")
 
         self.set_button_active_appearance(self.stop_button)
 
@@ -25,7 +24,6 @@ class TriggerPanel(VBoxPanel):
         self.single_button.clicked.connect(lambda: self.set_button_active_appearance(self.single_button))
         self.normal_button.clicked.connect(lambda: self.set_button_active_appearance(self.normal_button))
         self.auto_button.clicked.connect(lambda: self.set_button_active_appearance(self.auto_button))
-        self.external_button.clicked.connect(lambda: self.set_button_active_appearance(self.external_button))
 
         # layout.addWidget(Label("Trigger"))
         t_buttons = HBoxPanel(widgets=[
@@ -33,7 +31,7 @@ class TriggerPanel(VBoxPanel):
                 VBoxPanel(
                     widgets=[
                         Label("Trigger"),
-                        self.stop_button, self.single_button, self.normal_button, self.auto_button, self.external_button
+                        self.stop_button, self.single_button, self.normal_button, self.auto_button
                     ],
                     margins=0
                 ),
@@ -42,11 +40,6 @@ class TriggerPanel(VBoxPanel):
             QSpacerItem
         ], margins=0)
         main_panel = VBoxPanel(margins=0)
-        # main_panel.setAutoFillBackground(True)
-        # palette = QPalette()
-        # palette.setColor(QPalette.ColorRole.Window, "orange")
-        # main_panel.setPalette(palette)
-
         main_panel.addWidget(t_buttons)
 
         self.trigger_level = QSlider(Qt.Orientation.Vertical)
@@ -58,22 +51,20 @@ class TriggerPanel(VBoxPanel):
         trig_level_panel = VBoxPanel([Label("Trig Level"), HBoxPanel([self.trigger_level], margins=0)], margins=0)
         layout.addWidget(HBoxPanel([main_panel, trig_level_panel], margins=0))
 
-        main_panel.addWidget(HBoxPanel(
-            widgets=[
-                ComboBox(
-                    items=["Channel 1", "Channel 2"],
-                    current_selection=f"Channel {app.model.trigger.on_channel + 1}",
-                    min_width=100,
-                    on_text_change=self.trigger_channel_callback
-                ),
-            ],
-            margins=(0, 30, 0, 0)
-        ))
+        main_panel.addWidget(VBoxPanel([QLabel("Trigger on")], margins=(0, 40, 0, 0)))
+        self.channel_selector = ComboBox(
+            items=["Channel 1", "Channel 2"],
+            current_selection=f"Channel {app.model.trigger.on_channel + 1}",
+            min_width=100,
+            on_text_change=self.trigger_channel_callback
+        )
+        self.tot = QSpinBox(self)
+        self.delta = QSpinBox(self)
 
         main_panel.addWidget(HBoxPanel(
             widgets=[
                 ComboBox(
-                    items=["Rising Edge", "Falling Edge"],
+                    items=["Rising Edge", "Falling Edge", "External Signal"],
                     current_selection=app.model.trigger.trigger_type.value,
                     min_width=100,
                     on_text_change=self.trigger_type_callback
@@ -81,15 +72,14 @@ class TriggerPanel(VBoxPanel):
             ],
             margins=0
         ))
+        main_panel.addWidget(HBoxPanel(widgets=[self.channel_selector], margins=0))
 
-        self.tot = QSpinBox(self)
         self.tot.setMaximum(0)
         self.tot.setMaximum(255)
         self.tot.setValue(app.model.trigger.tot)
         self.tot.valueChanged.connect(self.tot_change_callback)
         main_panel.addWidget(HBoxPanel([self.tot, Label("ToT")], margins=0))
 
-        self.delta = QSpinBox(self)
         self.delta.setMaximum(0)
         self.delta.setMaximum(100)
         self.delta.setValue(app.model.trigger.delta)
@@ -113,7 +103,7 @@ class TriggerPanel(VBoxPanel):
         self.setPalette(self.app.side_pannels_palette())
 
     def set_button_active_appearance(self, button: PushButton) -> None:
-        for b in [self.stop_button, self.single_button, self.normal_button, self.auto_button, self.external_button]:
+        for b in [self.stop_button, self.single_button, self.normal_button, self.auto_button]:
             if b is button:
                 b.setStyleSheet("background-color: lime; color: black")
             else:
@@ -124,6 +114,18 @@ class TriggerPanel(VBoxPanel):
 
     def trigger_type_callback(self, trigger_type: str):
         self.app.model.trigger.trigger_type = TriggerTypeModel.value_of(trigger_type)
+        if self.app.model.trigger.trigger_type == TriggerTypeModel.EXTERNAL_SIGNAL:
+            self.trigger_level.setEnabled(False)
+            self.channel_selector.setEnabled(False)
+            self.tot.setEnabled(False)
+            self.delta.setEnabled(False)
+            self.set_trigger_level_line_visible(False)
+        else:
+            self.trigger_level.setEnabled(True)
+            self.channel_selector.setEnabled(True)
+            self.tot.setEnabled(True)
+            self.delta.setEnabled(True)
+            self.set_trigger_level_line_visible(True)
 
     def tot_change_callback(self):
         self.app.model.trigger.tot = self.tot.value()
@@ -150,3 +152,6 @@ class TriggerPanel(VBoxPanel):
         if value != self.app.model.trigger.position:
             self.app.model.trigger.position = value
             self.trigger_position.setSliderPosition(int(value * 999))
+
+    def set_trigger_level_line_visible(self, visible: bool):
+        self.app.set_trigger_level_line_visible(visible)

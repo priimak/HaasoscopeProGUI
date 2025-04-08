@@ -17,6 +17,7 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.pens = [self.mkPen(ch.color) for ch in self.app.model.channel]
 
         self.plot: PlotItem = self.addPlot(0, 0)
+        self.plot.setMenuEnabled(False)
         self.plot.showGrid(True, True, 0.4)
         self.app.set_show_grid_state = lambda show_grid: self.plot.showGrid(show_grid, show_grid, 0.4)
 
@@ -67,6 +68,7 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.plot.addItem(self.trigger_level_line)
         self.trigger_level_line.yChanged.connect(self.set_trigger_level_from_plot_line)
         self.app.set_trigger_level_from_side_controls = lambda level: self.trigger_level_line.setPos(5 * level)
+        self.app.set_trigger_level_line_visible = self.trigger_level_line.setVisible
 
         self.black_pen = QPen()
         self.black_pen.setCosmetic(True)
@@ -105,6 +107,7 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.setMouseTracking(True)
         self.plot.scene().sigMouseMoved.connect(self.on_mouse_moved)
         self.plot.setCursor(Qt.CursorShape.CrossCursor)
+        self.plot.getAxis('bottom').setZValue(-1)
 
     def on_mouse_moved(self, evt: QPointF):
         pos = evt

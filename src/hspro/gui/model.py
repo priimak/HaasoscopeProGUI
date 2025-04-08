@@ -17,6 +17,7 @@ class TimeScale:
 class TriggerTypeModel(Enum):
     ON_RISING_EDGE = "Rising Edge"
     ON_FALLING_EDGE = "Falling Edge"
+    EXTERNAL_SIGNAL = "External Signal"
 
     @staticmethod
     def value_of(value: str) -> "TriggerTypeModel":
@@ -25,6 +26,8 @@ class TriggerTypeModel(Enum):
                 return TriggerTypeModel.ON_RISING_EDGE
             case "Falling Edge":
                 return TriggerTypeModel.ON_FALLING_EDGE
+            case "External Signal":
+                return TriggerTypeModel.EXTERNAL_SIGNAL
             case _:
                 raise RuntimeError(f"Unknown trigger type: {value}")
 

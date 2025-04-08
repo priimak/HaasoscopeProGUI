@@ -10,43 +10,46 @@ class TraceMenu(QMenu):
         super().__init__("&Trace", parent)
         self.app = app
 
-        self.read_out_options = QAction("Readout options", self)
+        self.read_out_options = QAction("&Readout options", self)
         self.read_out_options.triggered.connect(self.show_readout_options_dialog)
         self.addAction(self.read_out_options)
 
-        self.advanced_settings = QAction("Advanced settings", self)
+        self.advanced_settings = QAction("&Advanced settings", self)
+        self.advanced_settings.setEnabled(False)
         self.addAction(self.advanced_settings)
 
         self.addSeparator()
 
-        self.show_fft = QAction("Show FFT", self)
+        self.show_fft = QAction("Show &FFT", self)
+        self.show_fft.setEnabled(False)
         self.addAction(self.show_fft)
 
-        self.show_persist = QAction("Show Persist", self)
+        self.show_persist = QAction("Show &Persist", self)
         self.show_persist.setCheckable(True)
         self.show_persist.setChecked(False)
+        self.show_persist.setEnabled(False)
         self.addAction(self.show_persist)
 
-        self.show_grid = QAction("Show grid", self)
+        self.show_grid = QAction("Show &Grid", self)
         self.show_grid.setCheckable(True)
         self.show_grid.setChecked(True)
         self.show_grid.triggered.connect(self.set_show_grid_state)
         self.addAction(self.show_grid)
 
-        self.show_zero_line = QAction("Show zero line", self)
+        self.show_zero_line = QAction("Show &Zero Line", self)
         self.show_zero_line.setCheckable(True)
         self.show_zero_line.setChecked(True)
         self.show_zero_line.triggered.connect(self.set_show_zero_line_state)
         self.addAction(self.show_zero_line)
 
-        plot_color_scheme_menu = self.addMenu("Color scheme")
+        plot_color_scheme_menu = self.addMenu("Color &Scheme")
 
-        self.plot_color_scheme_light = QAction("Light", self)
+        self.plot_color_scheme_light = QAction("&Light", self)
         self.plot_color_scheme_light.setCheckable(True)
         plot_color_scheme_menu.addAction(self.plot_color_scheme_light)
         self.plot_color_scheme_light.triggered.connect(self.set_plot_color_scheme_light)
 
-        self.plot_color_scheme_dark = QAction("Dark", self)
+        self.plot_color_scheme_dark = QAction("&Dark", self)
         self.plot_color_scheme_dark.setCheckable(True)
         plot_color_scheme_menu.addAction(self.plot_color_scheme_dark)
         self.plot_color_scheme_dark.triggered.connect(self.set_plot_color_scheme_dark)
