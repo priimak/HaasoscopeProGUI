@@ -1,5 +1,3 @@
-import math
-
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QScrollArea
 from pytide6 import MainWindow, set_geometry, VBoxPanel, W, HBoxPanel, Label
@@ -25,7 +23,6 @@ class HSProMainWindow(MainWindow):
         self.app.app_persistence = app_persistence
         self.app.main_window = lambda: self
         self.app.exit_application = self.close
-        # self.app.set_plot_color_scheme = self.set_plot_color_scheme
 
         set_geometry(app_state=app_persistence.state, widget=self, screen_dim=screen_dim, win_size_fraction=0.7)
 
@@ -33,30 +30,8 @@ class HSProMainWindow(MainWindow):
 
         self.glw = PlotsPanel(self, self.app)
 
-        x = [0.01 * i for i in range(-100, 3000)]
-        y = [math.sin(t) for t in x]
-
-        # grid = GridItem()
-        # grid.setTickSpacing(x = [1.0], y = [1.0])
-        # self.plot.addItem(grid)
-
-        # axis = AxisItem("bottom")
-        # axis.setVisible(False)
-        # self.plot.addItem(axis)
-
-        # pp: PlotDataItem = self.plot.plot(x, y)
-        # self.plot.setXRange(0, 10, padding=0.0)
-        # self.plot.setYRange(-5, 5, padding=0.0)
-
-        # plot_item.plot(x, y)
-        # print(pp.name())
-        # self.plot.addItem(plot_item)
-
         right_panel = VBoxPanel(
-            widgets=[
-                # TriggerPanel(self.app), W(Label(""), stretch=10)
-                TriggerPanel(self.app), GeneralOptionsPanel(self.app), W(Label(""), stretch=10)
-            ],
+            widgets=[TriggerPanel(self.app), GeneralOptionsPanel(self.app), W(Label(""), stretch=10)],
             margins=0
         )
         channels_area = QScrollArea()
