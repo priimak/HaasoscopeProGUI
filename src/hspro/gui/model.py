@@ -3,6 +3,7 @@ from enum import Enum
 from functools import cache
 from typing import Type, Callable
 
+from hspro_api.board import Board, ChannelCoupling, InputImpedance
 from sprats.config import AppPersistence
 from unlib import Duration
 
@@ -106,7 +107,8 @@ class ModelBase:
 class ChannelModel(ModelBase):
     def __init__(self, parent, channel_num: int, persistence: AppPersistence):
         super().__init__(persistence)
-        self.parent: BoardModel = parent
+        self.board_model: BoardModel = parent
+        self.channel_num: int = channel_num
 
         self.__active = self.get(f"/channels/{channel_num}/active", bool)
         self.__color = self.get(f"/channels/{channel_num}/color", str)
@@ -129,7 +131,7 @@ class ChannelModel(ModelBase):
     def active(self, value: bool):
         if self.__active.value != value:
             self.__active.value = self.__active.setter(value)
-            self.parent.on_channel_active_change()
+            self.board_model.on_channel_active_change()
 
     @property
     def color(self) -> str:
@@ -162,6 +164,14 @@ class ChannelModel(ModelBase):
     @coupling.setter
     def coupling(self, value: ChannelCouplingModel) -> None:
         self.__coupling.value = self.__coupling.setter(value)
+        if self.board_model.board is not None:
+            match value:
+                case ChannelCouplingModel.AC:
+                    self.board_model.board.set_channel_coupling(self.channel_num, ChannelCoupling.AC)
+                case ChannelCouplingModel.DC:
+                    self.board_model.board.set_channel_coupling(self.channel_num, ChannelCoupling.DC)
+                case _:
+                    raise RuntimeError(f"Invalid channel coupling {value}")
 
     @property
     def impedance(self) -> ChannelImpedanceModel:
@@ -170,6 +180,14 @@ class ChannelModel(ModelBase):
     @impedance.setter
     def impedance(self, value: ChannelImpedanceModel) -> None:
         self.__impedance.value = self.__impedance.setter(value)
+        if self.board_model.board is not None:
+            match value:
+                case ChannelImpedanceModel.FIFTY_OHM:
+                    self.board_model.board.set_channel_input_impedance(channel=0, impedance=InputImpedance.FIFTY_OHM)
+                case ChannelImpedanceModel.ONE_MEGA_OHM:
+                    self.board_model.board.set_channel_input_impedance(channel=0, impedance=InputImpedance.ONE_MEGA_OHM)
+                case _:
+                    raise RuntimeError(f"Invalid channel impedance value {value}")
 
     @property
     def ten_x_probe(self) -> bool:
@@ -178,6 +196,8 @@ class ChannelModel(ModelBase):
     @ten_x_probe.setter
     def ten_x_probe(self, value: bool):
         self.__ten_x_probe.value = self.__ten_x_probe.setter(value)
+        if self.board_model.board is not None:
+            self.board_model.board.set_channel_10x_probe(self.channel_num, value)
 
     @property
     def five_x_attenuation(self) -> bool:
@@ -189,8 +209,9 @@ class ChannelModel(ModelBase):
 
 
 class TriggerModel(ModelBase):
-    def __init__(self, persistence: AppPersistence):
+    def __init__(self, parent, persistence: AppPersistence):
         super().__init__(persistence)
+        self.board_model: BoardModel = parent
 
         self.__on_channel = self.get("/trigger/on_channel", int)
         self.__trigger_type = self.get(
@@ -201,6 +222,16 @@ class TriggerModel(ModelBase):
         self.__level = self.get("/trigger/level", float)
         self.__position = self.get("/trigger/position", float)
 
+    def __update_live_trigger_properties(self):
+        if self.board_model.board is not None:
+            self.board_model.board.set_trigger_props(
+                trigger_level=self.level,
+                trigger_delta=self.delta,
+                trigger_pos=self.position,
+                tot=self.tot,
+                trigger_on_chanel=self.__on_channel.value
+            )
+
     @property
     def on_channel(self) -> int:
         return self.__on_channel.value
@@ -208,6 +239,7 @@ class TriggerModel(ModelBase):
     @on_channel.setter
     def on_channel(self, value: int):
         self.__on_channel.value = self.__on_channel.setter(value)
+        self.__update_live_trigger_properties()
 
     @property
     def trigger_type(self) -> TriggerTypeModel:
@@ -224,6 +256,7 @@ class TriggerModel(ModelBase):
     @tot.setter
     def tot(self, value: int):
         self.__tot.value = self.__tot.setter(value)
+        self.__update_live_trigger_properties()
 
     @property
     def delta(self) -> int:
@@ -232,6 +265,7 @@ class TriggerModel(ModelBase):
     @delta.setter
     def delta(self, value: int):
         self.__delta.value = self.__delta.setter(value)
+        self.__update_live_trigger_properties()
 
     @property
     def level(self) -> float:
@@ -240,6 +274,7 @@ class TriggerModel(ModelBase):
     @level.setter
     def level(self, value: float):
         self.__level.value = self.__level.setter(value)
+        self.__update_live_trigger_properties()
 
     @property
     def position(self) -> float:
@@ -248,6 +283,7 @@ class TriggerModel(ModelBase):
     @position.setter
     def position(self, value: float):
         self.__position.value = self.__position.setter(value)
+        self.__update_live_trigger_properties()
 
 
 class BoardModel(ModelBase):
@@ -259,15 +295,42 @@ class BoardModel(ModelBase):
     def __init__(self, persistence: AppPersistence):
         super().__init__(persistence)
         self.channel = [ChannelModel(self, 1, persistence), ChannelModel(self, 2, persistence)]
-        self.trigger = TriggerModel(persistence)
+        self.trigger = TriggerModel(self, persistence)
 
-        self.__highres = self.get(f"/general/highres", bool)
-        self.__mem_depth = self.get(f"/general/mem_depth", int)
-        self.__delay = self.get(f"/general/delay", int)
-        self.__f_delay = self.get(f"/general/f_delay", int)
+        self.__highres = self.get("/general/highres", bool)
+        self.__mem_depth = self.get("/general/mem_depth", int)
+        self.__delay = self.get("/general/delay", int)
+        self.__f_delay = self.get("/general/f_delay", int)
 
         self.on_memdepth_change: Callable[[], None] = lambda: None
         self.on_channel_active_change: Callable[[], None] = lambda: None
+        self.board: Board | None = None
+
+        def configure_time_scale() -> Duration:
+            cfg_time_scale = self.persistence.config.get_by_xpath("/general/time_scale", str)
+            if cfg_time_scale is None:
+                time_scale = self._get_first_valid_time_scale()
+                self.persistence.config.set_by_xpath("/general/time_scale", f"{time_scale}")
+                return time_scale
+            else:
+                return Duration.value_of(cfg_time_scale)
+
+        self.time_scale = configure_time_scale()
+
+    def link_to_live_board(self, board: Board):
+        self.board = board
+
+    @property
+    def time_scale(self) -> Duration:
+        return self.__time_scale
+
+    @time_scale.setter
+    def time_scale(self, value: Duration):
+        if self.board is not None:
+            value = self.board.set_time_scale(value)
+
+        self.__time_scale = value
+        self.persistence.config.set_by_xpath("/general/time_scale", f"{self.__time_scale}")
 
     @property
     def highres(self) -> bool:
@@ -276,6 +339,8 @@ class BoardModel(ModelBase):
     @highres.setter
     def highres(self, value: bool):
         self.__highres.value = self.__highres.setter(value)
+        if self.board is not None:
+            self.board.set_highres_capture_mode(value)
 
     @property
     def mem_depth(self) -> int:
@@ -286,6 +351,8 @@ class BoardModel(ModelBase):
         if self.mem_depth != value:
             self.__mem_depth.value = self.__mem_depth.setter(value)
             self.on_memdepth_change()
+            if self.board is not None:
+                self.board.set_memory_depth(value)
 
     @property
     def delay(self) -> int:
@@ -294,6 +361,7 @@ class BoardModel(ModelBase):
     @delay.setter
     def delay(self, value: int):
         self.__delay.value = self.__delay.setter(value)
+        # TODO: Add control in live board API
 
     @property
     def f_delay(self) -> int:
@@ -302,6 +370,15 @@ class BoardModel(ModelBase):
     @f_delay.setter
     def f_delay(self, value: int):
         self.__f_delay.value = self.__f_delay.setter(value)
+        # TODO: Add control in live board API
+
+    def _get_first_valid_time_scale(self) -> Duration:
+        return self.get_next_valid_time_scale(
+            two_channel_operation=self.channel[1].active,
+            mem_depth=self.mem_depth,
+            current_value=Duration.value_of("0 s"),
+            index_offset=0
+        )
 
     @cache
     def get_next_valid_time_scale(
@@ -341,11 +418,14 @@ class BoardModel(ModelBase):
         valid_downsamplemergin_values = get_valid_downsamplemergin_values()
 
         results = []
+        durations: set = set()
         for downsample in range(32):
             for downsamplemerging in valid_downsamplemergin_values:
                 dt_s = BoardModel.NATIVE_SAMPLE_PERIOD_S * downsamplemerging * pow(2, downsample)
-                results.append(Duration.value_of(f"{dt_s * num_samples_per_division} s").optimize())
-        results = list(set(results))
+                duration = Duration.value_of(f"{dt_s * num_samples_per_division} s").optimize()
+                if duration not in durations:
+                    results.append(duration)
+                    durations.add(duration)
         results.sort()
         return results
 

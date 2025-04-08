@@ -1,12 +1,11 @@
 import math
 
-from PyQt5.QtCore import QPointF
+from PySide6.QtCore import QPointF
 from PySide6.QtGui import QPen, Qt, QFontDatabase
+from hspro.gui.app import App
 from pyqtgraph import AxisItem, GraphicsLayoutWidget, InfiniteLine, PlotDataItem, TextItem
 from pyqtgraph.graphicsItems.PlotItem import PlotItem
 from pyqtgraph.graphicsItems.ViewBox import ViewBox
-
-from hspro.gui.app import App
 
 
 class PlotsPanel(GraphicsLayoutWidget):

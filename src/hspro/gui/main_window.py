@@ -54,3 +54,19 @@ class HSProMainWindow(MainWindow):
         )
 
         self.app.init()
+
+    def connect_to_board(self):
+        # boards: list[Board] = connect(debug=True, debug_spi=True)
+        # len_boards = len(boards)
+        # if len_boards == 1:
+        #     # just use the only board that we found
+        #     self.app.model.link_to_live_board(boards[0])
+        #     self.app.set_connection_status_label("Connected")
+        #
+        # elif len_boards > 1:
+        #     # ask user to select one
+        #     board_selector_dialog = BoardSelectorDialog(self, boards)
+        #     board_selector_dialog.exec_()
+        #     if board_selector_dialog.selected_board is not None:
+        #         self.app.model.link_to_live_board(board_selector_dialog.selected_board)
+        pass

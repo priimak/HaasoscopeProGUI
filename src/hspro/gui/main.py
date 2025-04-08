@@ -60,12 +60,6 @@ def main():
         }
     )
 
-    if persistence.config.get_by_xpath("/general/downsamplemerging", int) is None:
-        persistence.config.set_by_xpath("/general/downsamplemerging", 1)
-
-    if persistence.config.get_by_xpath("/general/downsample", int) is None:
-        persistence.config.set_by_xpath("/general/downsample", 0)
-
     if persistence.config.get_by_xpath("/general/delay", int) is None:
         persistence.config.set_by_xpath("/general/delay", 0)
 
@@ -76,6 +70,7 @@ def main():
     win.show()
     win.activateWindow()
     win.raise_()
+    win.connect_to_board()
     sys.exit(app.exec())
 
 
