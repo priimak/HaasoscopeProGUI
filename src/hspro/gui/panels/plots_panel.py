@@ -1,11 +1,12 @@
 import math
 
 from PySide6.QtCore import QPointF
-from PySide6.QtGui import QPen, Qt, QFontDatabase
-from hspro.gui.app import App
+from PySide6.QtGui import QPen, Qt, QFontDatabase, QColor
 from pyqtgraph import AxisItem, GraphicsLayoutWidget, InfiniteLine, PlotDataItem, TextItem
 from pyqtgraph.graphicsItems.PlotItem import PlotItem
 from pyqtgraph.graphicsItems.ViewBox import ViewBox
+
+from hspro.gui.app import App
 
 
 class PlotsPanel(GraphicsLayoutWidget):
@@ -14,6 +15,8 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.app = app
         self.app.set_plot_color_scheme = self.set_plot_color_scheme
         self.pens = [self.mkPen(ch.color) for ch in self.app.model.channel]
+
+        self.trigger_lines_color_map = "Default"
 
         self.plot: PlotItem = self.addPlot(0, 0)
         self.plot.setMenuEnabled(False)
@@ -47,7 +50,7 @@ class PlotsPanel(GraphicsLayoutWidget):
 
         self.trigger_lines_pen = QPen()
         self.trigger_lines_pen.setCosmetic(True)
-        self.trigger_lines_pen.setColor("#0000FF")
+        self.trigger_lines_pen.setColor(QColor(0, 0, 0xff, 100))
         self.trigger_lines_pen.setWidth(1)
         self.trigger_lines_pen.setStyle(Qt.PenStyle.CustomDashLine)
         self.trigger_lines_pen.setDashPattern([8, 8])
@@ -56,18 +59,29 @@ class PlotsPanel(GraphicsLayoutWidget):
             pos=10 * app.model.trigger.position,
             movable=True, angle=90, pen=self.trigger_lines_pen
         )
+        self.trigger_pos_line.setZValue(10)
         self.plot.addItem(self.trigger_pos_line)
         self.trigger_pos_line.xChanged.connect(self.set_trigger_pos_from_plot_line)
         self.app.set_trigger_pos_from_side_controls = lambda pos: self.trigger_pos_line.setPos(10 * pos)
 
+        self.trigger_lines_hpen = QPen()
+        self.trigger_lines_hpen.setCosmetic(True)
+        self.trigger_lines_hpen.setColor(QColor(0, 0, 0xff, 255))
+        self.trigger_lines_hpen.setWidth(1)
+        self.trigger_lines_hpen.setStyle(Qt.PenStyle.SolidLine)
+
         self.trigger_level_line = InfiniteLine(
             pos=5 * app.model.trigger.level,
-            movable=True, angle=0, pen=self.trigger_lines_pen
+            movable=True, angle=0, pen=self.trigger_lines_pen,
+            hoverPen=self.trigger_lines_hpen
         )
         self.plot.addItem(self.trigger_level_line)
         self.trigger_level_line.yChanged.connect(self.set_trigger_level_from_plot_line)
         self.app.set_trigger_level_from_side_controls = lambda level: self.trigger_level_line.setPos(5 * level)
         self.app.set_trigger_level_line_visible = self.trigger_level_line.setVisible
+        self.app.set_trigger_lines_width = self.set_trigger_lines_width
+        self.app.update_trigger_lines_color = self.update_trigger_lines_color
+        self.app.set_trigger_lines_color_map = self.set_trigger_lines_color_map
 
         self.black_pen = QPen()
         self.black_pen.setCosmetic(True)
@@ -158,3 +172,33 @@ class PlotsPanel(GraphicsLayoutWidget):
     def channel_color_changed(self, channel: int, color: str):
         self.pens[channel].setColor(color)
         self.demo_trace[channel].setPen(self.pens[channel])
+
+    def set_trigger_lines_width(self, width: int):
+        self.trigger_lines_pen.setWidth(width)
+        self.trigger_lines_hpen.setWidth(width)
+
+        self.trigger_level_line.setPen(self.trigger_lines_pen)
+        self.trigger_level_line.setHoverPen(self.trigger_lines_hpen)
+        self.trigger_pos_line.setPen(self.trigger_lines_pen)
+        self.trigger_pos_line.setHoverPen(self.trigger_lines_hpen)
+
+    def update_trigger_lines_color(self):
+        match self.trigger_lines_color_map:
+            case "Matching Trigger Channel":
+                self.trigger_lines_pen.setColor(self.app.model.channel[self.app.model.trigger.on_channel].color)
+                self.trigger_lines_hpen.setColor(self.app.model.channel[self.app.model.trigger.on_channel].color)
+            case _:
+                if self.app.plot_color_scheme == "light":
+                    self.trigger_lines_pen.setColor("#0000FF")
+                    self.trigger_lines_hpen.setColor("#0000FF")
+                elif self.app.plot_color_scheme == "dark":
+                    self.trigger_lines_pen.setColor("#FFFFFF")
+                    self.trigger_lines_hpen.setColor("#FFFFFF")
+
+        self.trigger_level_line.setPen(self.trigger_lines_pen)
+        self.trigger_level_line.setHoverPen(self.trigger_lines_hpen)
+        self.trigger_pos_line.setPen(self.trigger_lines_pen)
+        self.trigger_pos_line.setHoverPen(self.trigger_lines_hpen)
+
+    def set_trigger_lines_color_map(self, color_map: str):
+        self.trigger_lines_color_map = color_map

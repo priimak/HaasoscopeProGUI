@@ -45,7 +45,7 @@ class ChannelsPanel(VBoxPanel):
         self.app = app
 
         for channel in app.channels:
-            channel_name = f"Ch #{channel + 1}"
+            channel_name = f"Ch #{channel}"
 
             channel_color_selector = Label(" ")
             channel_color_selector.setMinimumWidth(100)
@@ -63,6 +63,7 @@ class ChannelsPanel(VBoxPanel):
                         color_selector.color = new_color
                         app.model.channel[color_selector.channel].color = new_color
                         app.set_channel_color(color_selector.channel, new_color)
+                        app.update_trigger_lines_color()
 
                 return select_color
 

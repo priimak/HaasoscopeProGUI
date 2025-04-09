@@ -53,8 +53,8 @@ class TriggerPanel(VBoxPanel):
 
         main_panel.addWidget(VBoxPanel([QLabel("Trigger on")], margins=(0, 40, 0, 0)))
         self.channel_selector = ComboBox(
-            items=["Channel 1", "Channel 2"],
-            current_selection=f"Channel {app.model.trigger.on_channel + 1}",
+            items=["Channel 0", "Channel 1"],
+            current_selection=f"Channel {app.model.trigger.on_channel}",
             min_width=100,
             on_text_change=self.trigger_channel_callback
         )
@@ -110,7 +110,8 @@ class TriggerPanel(VBoxPanel):
                 b.setStyleSheet("background-color: darkred; color: white")
 
     def trigger_channel_callback(self, channel: str):
-        self.app.model.trigger.on_channel = int(0 if "1" in channel else 1)
+        self.app.model.trigger.on_channel = int(channel.replace("Channel", "").strip())
+        self.app.update_trigger_lines_color()
 
     def trigger_type_callback(self, trigger_type: str):
         self.app.model.trigger.trigger_type = TriggerTypeModel.value_of(trigger_type)

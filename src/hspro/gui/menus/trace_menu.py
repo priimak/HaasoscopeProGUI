@@ -62,11 +62,13 @@ class TraceMenu(QMenu):
         self.plot_color_scheme_light.setChecked(True)
         self.plot_color_scheme_dark.setChecked(False)
         self.app.set_plot_color_scheme("light")
+        self.app.plot_color_scheme = "light"
 
     def set_plot_color_scheme_dark(self):
         self.plot_color_scheme_light.setChecked(False)
         self.plot_color_scheme_dark.setChecked(True)
         self.app.set_plot_color_scheme("dark")
+        self.app.plot_color_scheme = "dark"
 
     def set_show_grid_state(self, show_grid: bool):
         self.app.set_show_grid_state(show_grid)
