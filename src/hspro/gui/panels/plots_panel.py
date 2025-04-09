@@ -122,6 +122,8 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.plot.setCursor(Qt.CursorShape.CrossCursor)
         self.plot.getAxis('bottom').setZValue(-1)
 
+        self.update_trigger_lines_color()
+
     def on_mouse_moved(self, evt: QPointF):
         pos = evt
         if self.plot.sceneBoundingRect().contains(pos):
@@ -187,13 +189,13 @@ class PlotsPanel(GraphicsLayoutWidget):
             case "Matching Trigger Channel":
                 self.trigger_lines_pen.setColor(self.app.model.channel[self.app.model.trigger.on_channel].color)
                 self.trigger_lines_hpen.setColor(self.app.model.channel[self.app.model.trigger.on_channel].color)
-            case _:
+            case _: # Default
                 if self.app.plot_color_scheme == "light":
                     self.trigger_lines_pen.setColor("#0000FF")
-                    self.trigger_lines_hpen.setColor("#0000FF")
+                    self.trigger_lines_hpen.setColor(self.app.model.channel[self.app.model.trigger.on_channel].color)
                 elif self.app.plot_color_scheme == "dark":
                     self.trigger_lines_pen.setColor("#FFFFFF")
-                    self.trigger_lines_hpen.setColor("#FFFFFF")
+                    self.trigger_lines_hpen.setColor(self.app.model.channel[self.app.model.trigger.on_channel].color)
 
         self.trigger_level_line.setPen(self.trigger_lines_pen)
         self.trigger_level_line.setHoverPen(self.trigger_lines_hpen)
