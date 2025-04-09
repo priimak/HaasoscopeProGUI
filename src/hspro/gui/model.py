@@ -157,6 +157,20 @@ class ChannelModel(ModelBase):
     def dV(self, value: float):
         self.__dV.value = self.__dV.setter(value)
 
+    # def set_voltage_div(self, channel: int, dV: float, do_oversample: bool, ten_x_probe: bool) -> float:
+    #     scaling_factor = 0.1605 * (10 if ten_x_probe else 1) * (2 if do_oversample else 1)
+    #     db = int(math.log10(scaling_factor / dV) * 20)
+    #
+    #     actual_voltage_per_division = scaling_factor / pow(10, db / 20.0)
+    #     self.set_spi_mode(0)
+    #
+    #     chan = (channel + 1) % 2 if do_oversample else channel
+    #     if chan == 0: self.spi_command("Amp Gain 0", 0x02, 0x00, 26 - db, False, cs=2, nbyte=2, quiet=True)
+    #     if chan == 1: self.spi_command("Amp Gain 1", 0x02, 0x00, 26 - db, False, cs=1, nbyte=2, quiet=True)
+    #     return actual_voltage_per_division
+    #
+    # def get_valid_dv_values(self, do_oversample: bool, ten_x_probe: bool) -> list[]:
+
     @property
     def coupling(self) -> ChannelCouplingModel:
         return self.__coupling.value

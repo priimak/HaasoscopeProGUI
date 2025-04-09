@@ -142,7 +142,7 @@ class PlotsPanel(GraphicsLayoutWidget):
         match plot_color_scheme:
             case "light":
                 self.setBackground("white")
-                self.trigger_lines_pen.setColor("#0000FF")
+                self.trigger_lines_pen.setColor("#101010")
                 self.trigger_level_line.setPen(self.trigger_lines_pen)
                 self.trigger_pos_line.setPen(self.trigger_lines_pen)
                 self.zero_h_line.setPen(self.black_pen)
@@ -189,9 +189,9 @@ class PlotsPanel(GraphicsLayoutWidget):
             case "Matching Trigger Channel":
                 self.trigger_lines_pen.setColor(self.app.model.channel[self.app.model.trigger.on_channel].color)
                 self.trigger_lines_hpen.setColor(self.app.model.channel[self.app.model.trigger.on_channel].color)
-            case _: # Default
+            case _:  # Default
                 if self.app.plot_color_scheme == "light":
-                    self.trigger_lines_pen.setColor("#0000FF")
+                    self.trigger_lines_pen.setColor("#101010")
                     self.trigger_lines_hpen.setColor(self.app.model.channel[self.app.model.trigger.on_channel].color)
                 elif self.app.plot_color_scheme == "dark":
                     self.trigger_lines_pen.setColor("#FFFFFF")
