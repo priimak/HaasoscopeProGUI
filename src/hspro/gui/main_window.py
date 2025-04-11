@@ -3,7 +3,7 @@ from PySide6.QtWidgets import QScrollArea
 from pytide6 import MainWindow, set_geometry, VBoxPanel, W, HBoxPanel, Label
 from sprats.config import AppPersistence
 
-from hspro.gui.app import App
+from hspro.gui.app import App, WorkerMessage
 from hspro.gui.menus.menu_bar import MainMenuBar
 from hspro.gui.model import BoardModel
 from hspro.gui.panels.channels_panel import ChannelsPanel
@@ -54,19 +54,29 @@ class HSProMainWindow(MainWindow):
         )
 
         self.app.init()
+        self.connect_to_board()
+        self.app.model.init_board_from_model()
+
+    def closeEvent(self, event):
+        self.app.gui_worker.messages.put(WorkerMessage.Quit())
+        super().closeEvent(event)
 
     def connect_to_board(self):
-        # boards: list[Board] = connect(debug=True, debug_spi=True)
-        # len_boards = len(boards)
-        # if len_boards == 1:
-        #     # just use the only board that we found
-        #     self.app.model.link_to_live_board(boards[0])
-        #     self.app.set_connection_status_label("Connected")
-        #
-        # elif len_boards > 1:
-        #     # ask user to select one
-        #     board_selector_dialog = BoardSelectorDialog(self, boards)
-        #     board_selector_dialog.exec_()
-        #     if board_selector_dialog.selected_board is not None:
-        #         self.app.model.link_to_live_board(board_selector_dialog.selected_board)
-        pass
+        from hspro_api.board import Board
+        from hspro_api import connect
+        from hspro.gui.board_selector_dialog import BoardSelectorDialog
+
+        boards: list[Board] = connect(debug=False, debug_spi=False, show_board_call_trace=True)
+        len_boards = len(boards)
+        if len_boards == 1:
+            # just use the only board that we found
+            self.app.model.link_to_live_board(boards[0])
+            self.app.set_connection_status_label("Connected")
+
+        elif len_boards > 1:
+            # ask user to select one
+            board_selector_dialog = BoardSelectorDialog(self, boards)
+            board_selector_dialog.exec_()
+            if board_selector_dialog.selected_board is not None:
+                self.app.model.link_to_live_board(board_selector_dialog.selected_board)
+        # pass

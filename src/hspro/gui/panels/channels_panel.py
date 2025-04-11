@@ -4,6 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPalette, QMouseEvent
 from PySide6.QtWidgets import QSpacerItem, QDoubleSpinBox, QColorDialog
 from pytide6 import VBoxPanel, CheckBox, ComboBox, Label, HBoxPanel, W
+from unlib import MetricValue, Scale
 
 from hspro.gui.app import App
 from hspro.gui.model import ChannelCouplingModel, ChannelImpedanceModel
@@ -14,13 +15,26 @@ class VperDivSpinner(QDoubleSpinBox):
         super().__init__()
         self.channel = channel
         self.app = app
-        # self.setDecimals(4)
-        self.setValue(app.model.channel[channel].dV)
+        self.setMinimum(0)
+        self.setMaximum(1000)
+        self.setDecimals(0)
+        self.voltage_per_division = MetricValue.value_of(f"{app.model.channel[channel].dV} V").optimize()
+        self.setValue(self.voltage_per_division.value)
+        self.setSuffix(f" {self.voltage_per_division.scale.to_str()}V/div")
 
     def stepBy(self, steps):
-        new_val = self.value() * (1.0 + steps * 0.1)
-        self.app.model.channel[self.channel].dV = new_val
-        self.setValue(new_val)
+        self.voltage_per_division = self.app.model.get_next_valid_voltage_scale(
+            current_voltage_scale=self.voltage_per_division,
+            do_oversample=False,
+            ten_x_probe=self.app.model.channel[self.channel].ten_x_probe,
+            index_offset=-steps
+        )
+        self.app.model.channel[self.channel].dV = self.voltage_per_division.to_float(Scale.UNIT)
+
+        # read it back is it might have changed/clipped in the board
+        self.voltage_per_division = MetricValue.value_of(f"{self.app.model.channel[self.channel].dV} V").optimize()
+        self.setValue(self.voltage_per_division.value)
+        self.setSuffix(f" {self.voltage_per_division.scale.to_str()}V/div")
 
 
 class VoltageOffsetSpinner(QDoubleSpinBox):
@@ -75,9 +89,10 @@ class ChannelsPanel(VBoxPanel):
 
             vdiv = VperDivSpinner(channel, app)
             voffset = VoltageOffsetSpinner(channel, app)
+            voffset.setEnabled(False)  # TODO: Re-enable me
 
             channel_config_panel = VBoxPanel(widgets=[
-                HBoxPanel(widgets=[vdiv, W(Label("V/div (Scale)"), stretch=10)], margins=0),
+                HBoxPanel(widgets=[vdiv, W(Label("Scale"), stretch=10)], margins=0),
                 HBoxPanel(widgets=[voffset, W(Label("V (Offset)"), stretch=10)], margins=0),
                 HBoxPanel(
                     widgets=[

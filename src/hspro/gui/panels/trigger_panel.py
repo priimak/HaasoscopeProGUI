@@ -1,8 +1,9 @@
 from PySide6.QtGui import Qt
 from PySide6.QtWidgets import QSpinBox, QSpacerItem, QSlider, QLabel
+from hspro_api import TriggerType
 from pytide6 import VBoxPanel, VBoxLayout, PushButton, Label, HBoxPanel, ComboBox, W
 
-from hspro.gui.app import App
+from hspro.gui.app import App, WorkerMessage
 from hspro.gui.model import TriggerTypeModel
 
 
@@ -19,11 +20,17 @@ class TriggerPanel(VBoxPanel):
         self.auto_button = PushButton("Auto")
 
         self.set_button_active_appearance(self.stop_button)
-
         self.stop_button.clicked.connect(lambda: self.set_button_active_appearance(self.stop_button))
+        self.stop_button.clicked.connect(self.disarm)
+
         self.single_button.clicked.connect(lambda: self.set_button_active_appearance(self.single_button))
+        self.single_button.clicked.connect(self.arm_single)
+
         self.normal_button.clicked.connect(lambda: self.set_button_active_appearance(self.normal_button))
+        self.normal_button.clicked.connect(self.arm_normal)
+
         self.auto_button.clicked.connect(lambda: self.set_button_active_appearance(self.auto_button))
+        self.auto_button.clicked.connect(self.arm_auto)
 
         # layout.addWidget(Label("Trigger"))
         t_buttons = HBoxPanel(widgets=[
@@ -102,6 +109,24 @@ class TriggerPanel(VBoxPanel):
         self.setAutoFillBackground(True)
         self.setPalette(self.app.side_pannels_palette())
 
+        self.app.disarm_trigger = self.disarm_trigger_from_worker
+        self.app.arm_single = self.arm_single_from_worker
+        self.app.arm_normal = self.arm_normal_from_worker
+        self.app.arm_auto = self.arm_auto_from_worker
+
+    def disarm_trigger_from_worker(self) -> None:
+        self.app.model.trigger.force_arm_trigger(TriggerType.DISABLED)
+        self.set_button_active_appearance(self.stop_button)
+
+    def arm_single_from_worker(self) -> None:
+        self.set_button_active_appearance(self.single_button)
+
+    def arm_normal_from_worker(self) -> None:
+        self.set_button_active_appearance(self.normal_button)
+
+    def arm_auto_from_worker(self) -> None:
+        self.set_button_active_appearance(self.auto_button)
+
     def set_button_active_appearance(self, button: PushButton) -> None:
         for b in [self.stop_button, self.single_button, self.normal_button, self.auto_button]:
             if b is button:
@@ -156,3 +181,19 @@ class TriggerPanel(VBoxPanel):
 
     def set_trigger_level_line_visible(self, visible: bool):
         self.app.set_trigger_level_line_visible(visible)
+
+    def disarm(self):
+        self.app.gui_worker.messages.put(WorkerMessage.Disarm())
+        self.set_button_active_appearance(self.stop_button)
+
+    def arm_single(self):
+        self.app.model.trigger.force_arm_trigger(TriggerType.DISABLED)
+        self.app.gui_worker.messages.put(WorkerMessage.ArmSingle(self.app.model.trigger.trigger_type.to_trigger_type()))
+
+    def arm_normal(self):
+        self.app.model.trigger.force_arm_trigger(TriggerType.DISABLED)
+        self.app.gui_worker.messages.put(WorkerMessage.ArmNormal(self.app.model.trigger.trigger_type.to_trigger_type()))
+
+    def arm_auto(self):
+        self.app.model.trigger.force_arm_trigger(TriggerType.DISABLED)
+        self.app.gui_worker.messages.put(WorkerMessage.ArmAuto())

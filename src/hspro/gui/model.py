@@ -1,11 +1,16 @@
+import math
+import time
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
-from typing import Type, Callable
+from random import random
+from typing import Type, Callable, Optional
 
-from hspro_api.board import Board, ChannelCoupling, InputImpedance
+from hspro_api import TriggerType, Waveform
+from hspro_api.board import Board, ChannelCoupling, InputImpedance, WaveformAvailability, WaveformAvailable, \
+    WaveformUnavailable
 from sprats.config import AppPersistence
-from unlib import Duration
+from unlib import Duration, MetricValue
 
 
 @dataclass
@@ -35,6 +40,17 @@ class TriggerTypeModel(Enum):
     @staticmethod
     def to_str(value: "TriggerTypeModel") -> str:
         return value.value
+
+    def to_trigger_type(self) -> TriggerType:
+        match self:
+            case TriggerTypeModel.ON_RISING_EDGE:
+                return TriggerType.ON_RISING_EDGE
+            case TriggerTypeModel.ON_FALLING_EDGE:
+                return TriggerType.ON_FALLING_EDGE
+            case TriggerTypeModel.EXTERNAL_SIGNAL:
+                return TriggerType.EXTERNAL
+            case _:
+                raise RuntimeError(f"Unknown trigger type: {self}")
 
 
 class ChannelCouplingModel(Enum):
@@ -132,6 +148,8 @@ class ChannelModel(ModelBase):
         if self.__active.value != value:
             self.__active.value = self.__active.setter(value)
             self.board_model.on_channel_active_change()
+        if self.channel_num == 1 and self.board_model.board is not None:
+            self.board_model.board.enable_two_channels(value)
 
     @property
     def color(self) -> str:
@@ -148,6 +166,8 @@ class ChannelModel(ModelBase):
     @offset_V.setter
     def offset_V(self, value: float):
         self.__offset_V.value = self.__offset_V.setter(value)
+        if self.board_model.board is not None:
+            self.__offset_V.value = self.board_model.board.set_channel_offset_V(self.channel_num, self.__offset_V.value)
 
     @property
     def dV(self) -> float:
@@ -156,20 +176,8 @@ class ChannelModel(ModelBase):
     @dV.setter
     def dV(self, value: float):
         self.__dV.value = self.__dV.setter(value)
-
-    # def set_voltage_div(self, channel: int, dV: float, do_oversample: bool, ten_x_probe: bool) -> float:
-    #     scaling_factor = 0.1605 * (10 if ten_x_probe else 1) * (2 if do_oversample else 1)
-    #     db = int(math.log10(scaling_factor / dV) * 20)
-    #
-    #     actual_voltage_per_division = scaling_factor / pow(10, db / 20.0)
-    #     self.set_spi_mode(0)
-    #
-    #     chan = (channel + 1) % 2 if do_oversample else channel
-    #     if chan == 0: self.spi_command("Amp Gain 0", 0x02, 0x00, 26 - db, False, cs=2, nbyte=2, quiet=True)
-    #     if chan == 1: self.spi_command("Amp Gain 1", 0x02, 0x00, 26 - db, False, cs=1, nbyte=2, quiet=True)
-    #     return actual_voltage_per_division
-    #
-    # def get_valid_dv_values(self, do_oversample: bool, ten_x_probe: bool) -> list[]:
+        if self.board_model.board is not None:
+            self.__dV.value = self.board_model.board.set_channel_voltage_div(self.channel_num, self.__dV.value)
 
     @property
     def coupling(self) -> ChannelCouplingModel:
@@ -219,7 +227,19 @@ class ChannelModel(ModelBase):
 
     @five_x_attenuation.setter
     def five_x_attenuation(self, value: bool):
-        self.__five_x_attenuation.value = self.__five_x_attenuation.setter(value)
+        raise RuntimeError("This operation is to be removed")
+        # self.__five_x_attenuation.value = self.__five_x_attenuation.setter(value)
+
+    def get_demo_waveform(self) -> Waveform | None:
+        if not self.active:
+            return None
+        else:
+            x = [0.01 * i for i in range(-100, 3000)]
+            offset = random()
+            x_scale = 1 + 0.05 * random()
+            y = [x_scale * t / 4 * math.sin(t * (1 + 0.1 * offset)) * (1 + 0.09 * math.sin(100 * t) * random()) for t in
+                 x]
+            return Waveform(0.01, y, trigger_pos=100, dV=1, trigger_level_V=0)
 
 
 class TriggerModel(ModelBase):
@@ -236,14 +256,17 @@ class TriggerModel(ModelBase):
         self.__level = self.get("/trigger/level", float)
         self.__position = self.get("/trigger/position", float)
 
-    def __update_live_trigger_properties(self):
+        # Used only when running without a board in demo mode
+        self._model_trigger_type = TriggerType.DISABLED
+
+    def update_live_trigger_properties(self):
         if self.board_model.board is not None:
             self.board_model.board.set_trigger_props(
                 trigger_level=self.level,
                 trigger_delta=self.delta,
                 trigger_pos=self.position,
                 tot=self.tot,
-                trigger_on_chanel=self.__on_channel.value
+                trigger_on_channel=self.__on_channel.value
             )
 
     @property
@@ -253,7 +276,7 @@ class TriggerModel(ModelBase):
     @on_channel.setter
     def on_channel(self, value: int):
         self.__on_channel.value = self.__on_channel.setter(value)
-        self.__update_live_trigger_properties()
+        self.update_live_trigger_properties()
 
     @property
     def trigger_type(self) -> TriggerTypeModel:
@@ -270,7 +293,7 @@ class TriggerModel(ModelBase):
     @tot.setter
     def tot(self, value: int):
         self.__tot.value = self.__tot.setter(value)
-        self.__update_live_trigger_properties()
+        self.update_live_trigger_properties()
 
     @property
     def delta(self) -> int:
@@ -279,7 +302,7 @@ class TriggerModel(ModelBase):
     @delta.setter
     def delta(self, value: int):
         self.__delta.value = self.__delta.setter(value)
-        self.__update_live_trigger_properties()
+        self.update_live_trigger_properties()
 
     @property
     def level(self) -> float:
@@ -288,7 +311,7 @@ class TriggerModel(ModelBase):
     @level.setter
     def level(self, value: float):
         self.__level.value = self.__level.setter(value)
-        self.__update_live_trigger_properties()
+        self.update_live_trigger_properties()
 
     @property
     def position(self) -> float:
@@ -297,7 +320,15 @@ class TriggerModel(ModelBase):
     @position.setter
     def position(self, value: float):
         self.__position.value = self.__position.setter(value)
-        self.__update_live_trigger_properties()
+        self.update_live_trigger_properties()
+
+    def force_arm_trigger(self, trigger_type: TriggerType) -> bool:
+        if self.board_model.board is None:
+            if trigger_type != TriggerType.DISABLED:
+                self._model_trigger_type = trigger_type
+            return True
+        else:
+            return self.board_model.board.force_arm_trigger(trigger_type)
 
 
 class BoardModel(ModelBase):
@@ -308,7 +339,7 @@ class BoardModel(ModelBase):
 
     def __init__(self, persistence: AppPersistence):
         super().__init__(persistence)
-        self.channel = [ChannelModel(self, 1, persistence), ChannelModel(self, 2, persistence)]
+        self.channel = [ChannelModel(self, 0, persistence), ChannelModel(self, 1, persistence)]
         self.trigger = TriggerModel(self, persistence)
 
         self.__highres = self.get("/general/highres", bool)
@@ -330,6 +361,7 @@ class BoardModel(ModelBase):
                 return Duration.value_of(cfg_time_scale)
 
         self.time_scale = configure_time_scale()
+        self.__demo_last_time_waveform_available = time.time()
 
     def link_to_live_board(self, board: Board):
         self.board = board
@@ -341,7 +373,7 @@ class BoardModel(ModelBase):
     @time_scale.setter
     def time_scale(self, value: Duration):
         if self.board is not None:
-            value = self.board.set_time_scale(value)
+            value = (self.board.set_time_scale(value) * self.board.num_samples_per_division()).optimize()
 
         self.__time_scale = value
         self.persistence.config.set_by_xpath("/general/time_scale", f"{self.__time_scale}")
@@ -455,3 +487,82 @@ class BoardModel(ModelBase):
         num_samples_per_division = samples_per_row_per_waveform * mem_depth / 10
         dt_s = BoardModel.NATIVE_SAMPLE_PERIOD_S * downsamplemerging * pow(2, downsample)
         return Duration.value_of(f"{dt_s * num_samples_per_division} s").optimize()
+
+    @cache
+    def get_valid_dv_values(self, do_oversample: bool, ten_x_probe: bool) -> list[MetricValue]:
+        tenx = 10 if ten_x_probe else 1
+
+        results = []
+        dbs = [-6, 0, 6, 12, 18, 24, 26]
+        for db in dbs:
+            v2 = 0.1605 * tenx / pow(10, db / 20.) * (2 if do_oversample else 1)
+            results.append(MetricValue.value_of(f"{v2} V").optimize())
+        return results
+
+    @cache
+    def get_next_valid_voltage_scale(
+            self,
+            current_voltage_scale: MetricValue,
+            do_oversample: bool,
+            ten_x_probe: bool,
+            index_offset: int
+    ) -> MetricValue:
+        valid_values: list[MetricValue] = self.get_valid_dv_values(do_oversample, ten_x_probe)
+
+        def current_index():
+            for i, d in enumerate(valid_values):
+                if d <= current_voltage_scale:
+                    return i
+            return 0
+
+        current_index = current_index()
+        next_index = min(max(current_index + index_offset, 0), len(valid_values) - 1)
+        return valid_values[next_index]
+
+    def init_board_from_model(self) -> None:
+        if self.board is not None:
+            # following seemingly meaningless code will trigger board write operations if live board is connected
+            self.time_scale = self.time_scale
+            self.highres = self.highres
+            self.mem_depth = self.mem_depth
+            self.delay = self.delay
+            self.f_delay = self.f_delay
+
+            self.trigger.update_live_trigger_properties()
+            for ch in self.channel:
+                ch.active = ch.active
+                ch.offset_V = ch.offset_V
+                ch.dV = ch.dV
+                ch.coupling = ch.coupling
+                ch.impedance = ch.impedance
+                ch.ten_x_probe = ch.ten_x_probe
+
+    def is_capture_available(self) -> WaveformAvailability:
+        if self.board is None:
+            match self.trigger._model_trigger_type:
+                case TriggerType.AUTO:
+                    return WaveformAvailable(0)
+                case TriggerType.DISABLED:
+                    return WaveformUnavailable()
+                case _:
+                    c_time = time.time()
+                    if c_time - self.__demo_last_time_waveform_available > 1:
+                        self.__demo_last_time_waveform_available = c_time
+                        return WaveformAvailable(0)
+                    else:
+                        return WaveformUnavailable()
+        else:
+            return self.board.wait_for_waveform(0)
+
+    def get_waveforms(self) -> tuple[Optional[Waveform], Optional[Waveform]]:
+        if self.board is None:
+            return self.channel[0].get_demo_waveform(), self.channel[0].get_demo_waveform()
+        else:
+            ws = self.board.get_waveforms()
+            retval: list[Optional[Waveform]] = []
+            for i, c in enumerate(self.channel):
+                if c.active:
+                    retval.append(ws[i])
+                else:
+                    retval.append(None)
+            return tuple(retval)

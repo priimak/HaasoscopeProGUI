@@ -21,11 +21,15 @@ def main():
 
     persistence = AppPersistence(
         app_name="hspro",
+        override_config_if_different_version=True,
         init_config_data={
+            "config_version": 1,
             "plot_color_scheme": "light",
             "general": {
                 "highres": True,
-                "mem_depth": 100
+                "mem_depth": 100,
+                "delay": 0,
+                "f_delay": 0
             },
             "trigger": {
                 "on_channel": 0,
@@ -36,7 +40,7 @@ def main():
                 "position": 0.5
             },
             "channels": {
-                "1": {
+                "0": {
                     "active": True,
                     "color": "#ff0000",
                     "offset_V": 0.0,
@@ -46,7 +50,7 @@ def main():
                     "ten_x_probe": False,
                     "five_x_attenuation": False
                 },
-                "2": {
+                "1": {
                     "active": False,
                     "color": "#0000ff",
                     "offset_V": 0.0,
@@ -60,17 +64,10 @@ def main():
         }
     )
 
-    if persistence.config.get_by_xpath("/general/delay", int) is None:
-        persistence.config.set_by_xpath("/general/delay", 0)
-
-    if persistence.config.get_by_xpath("/general/f_delay", int) is None:
-        persistence.config.set_by_xpath("/general/f_delay", 0)
-
     win = HSProMainWindow(screen_dim=(screen_width, screen_height), app_persistence=persistence)
     win.show()
     win.activateWindow()
     win.raise_()
-    win.connect_to_board()
     sys.exit(app.exec())
 
 

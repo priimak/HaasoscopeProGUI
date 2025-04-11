@@ -1,7 +1,8 @@
-import math
+from typing import Optional
 
 from PySide6.QtCore import QPointF
 from PySide6.QtGui import QPen, Qt, QFontDatabase, QColor
+from hspro_api import Waveform
 from pyqtgraph import AxisItem, GraphicsLayoutWidget, InfiniteLine, PlotDataItem, TextItem
 from pyqtgraph.graphicsItems.PlotItem import PlotItem
 from pyqtgraph.graphicsItems.ViewBox import ViewBox
@@ -91,21 +92,11 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.blue_pen.setCosmetic(True)
         self.blue_pen.setColor("#0000C8")
 
-        x = [0.01 * i for i in range(-100, 3000)]
-        y = [t / 4 * math.sin(t) for t in x]
-
-        demo_trace_1 = PlotDataItem(x, y)
-        demo_trace_1.setPen(self.pens[0])
-        demo_trace_1.setVisible(app.model.channel[0].active)
-
-        y = [(t + 1) / 4 * math.cos(t) for t in x]
-
-        demo_trace_2 = PlotDataItem(x, y)
-        demo_trace_2.setPen(self.pens[1])
-        demo_trace_2.setVisible(app.model.channel[1].active)
-        self.demo_trace = [demo_trace_1, demo_trace_2]
-        self.plot.addItem(demo_trace_1)
-        self.plot.addItem(demo_trace_2)
+        self.traces = [PlotDataItem(), PlotDataItem()]
+        for i, trace in enumerate(self.traces):
+            trace.setPen(self.pens[i])
+            trace.setVisible(self.app.model.channel[i].active)
+            self.plot.addItem(trace)
 
         self.app.set_channel_active_state = self.channel_active_state_changed
         self.app.set_channel_color = self.channel_color_changed
@@ -123,6 +114,8 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.plot.getAxis('bottom').setZValue(-1)
 
         self.update_trigger_lines_color()
+
+        self.app.plot_waveforms = self.plot_waveforms
 
     def on_mouse_moved(self, evt: QPointF):
         pos = evt
@@ -169,11 +162,11 @@ class PlotsPanel(GraphicsLayoutWidget):
         return pen
 
     def channel_active_state_changed(self, channel: int, active: bool):
-        self.demo_trace[channel].setVisible(active)
+        self.traces[channel].setVisible(active)
 
     def channel_color_changed(self, channel: int, color: str):
         self.pens[channel].setColor(color)
-        self.demo_trace[channel].setPen(self.pens[channel])
+        self.traces[channel].setPen(self.pens[channel])
 
     def set_trigger_lines_width(self, width: int):
         self.trigger_lines_pen.setWidth(width)
@@ -204,3 +197,9 @@ class PlotsPanel(GraphicsLayoutWidget):
 
     def set_trigger_lines_color_map(self, color_map: str):
         self.trigger_lines_color_map = color_map
+
+    def plot_waveforms(self, ws: tuple[Optional[Waveform], Optional[Waveform]]):
+        for i, w in enumerate(ws):
+            if w is not None:
+                len_vs = len(w.vs)
+                self.traces[i].setData([10 * (len_vs - i) / len_vs for i in range(len_vs)], w.vs)

@@ -7,7 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     "pyside6==6.8.0.2",
     "pyqtgraph==0.13.7",
-    "unlib @ git+https://github.com/priimak/unlib.git@v0.1.1",
+    "unlib @ git+https://github.com/priimak/unlib.git@v0.2.1",
     "pytide6 @ git+https://github.com/priimak/PyTide6.git@master",
     "HaasoscopeProPy @ git+https://github.com/priimak/HaasoscopeProPy.git@master"
 ]
