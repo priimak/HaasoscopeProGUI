@@ -66,7 +66,7 @@ class HSProMainWindow(MainWindow):
         from hspro_api import connect
         from hspro.gui.board_selector_dialog import BoardSelectorDialog
 
-        boards: list[Board] = connect(debug=False, debug_spi=False, show_board_call_trace=True)
+        boards: list[Board] = connect(debug=False, debug_spi=False, show_board_call_trace=False)
         len_boards = len(boards)
         if len_boards == 1:
             # just use the only board that we found

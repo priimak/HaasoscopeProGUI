@@ -1,7 +1,7 @@
 # from PyQt5.QtWidgets import QDoubleSpinBox
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDoubleSpinBox, QLabel
-from pytide6 import VBoxPanel, HBoxPanel, W, PushButton
+from pytide6 import VBoxPanel, HBoxPanel, W
 
 from hspro.gui.app import App
 
@@ -53,12 +53,12 @@ class GeneralOptionsPanel(VBoxPanel):
         self.layout().addWidget(QLabel("Time scale"), alignment=Qt.AlignmentFlag.AlignCenter)
         self.layout().addWidget(HBoxPanel([W(time_scale_input, alignment=Qt.AlignmentFlag.AlignCenter)], margins=0))
 
-        slower_b = PushButton("Slower", on_clicked=lambda: time_scale_input.stepBy(-1))
-        faster_b = PushButton("Faster", on_clicked=lambda: time_scale_input.stepBy(1))
-        self.layout().addWidget(HBoxPanel([
-            W(slower_b, alignment=Qt.AlignmentFlag.AlignLeft),
-            W(faster_b, alignment=Qt.AlignmentFlag.AlignRight)
-        ], margins=0))
+        # slower_b = PushButton("Slower", on_clicked=lambda: time_scale_input.stepBy(-1))
+        # faster_b = PushButton("Faster", on_clicked=lambda: time_scale_input.stepBy(1))
+        # self.layout().addWidget(HBoxPanel([
+        #     W(slower_b, alignment=Qt.AlignmentFlag.AlignLeft),
+        #     W(faster_b, alignment=Qt.AlignmentFlag.AlignRight)
+        # ], margins=0))
 
         self.setAutoFillBackground(True)
         self.setPalette(app.side_pannels_palette())

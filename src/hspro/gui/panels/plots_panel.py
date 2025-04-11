@@ -1,3 +1,5 @@
+import time
+from functools import cache
 from typing import Optional
 
 from PySide6.QtCore import QPointF
@@ -116,6 +118,7 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.update_trigger_lines_color()
 
         self.app.plot_waveforms = self.plot_waveforms
+        self.last_plotted_at = time.time()
 
     def on_mouse_moved(self, evt: QPointF):
         pos = evt
@@ -201,5 +204,12 @@ class PlotsPanel(GraphicsLayoutWidget):
     def plot_waveforms(self, ws: tuple[Optional[Waveform], Optional[Waveform]]):
         for i, w in enumerate(ws):
             if w is not None:
-                len_vs = len(w.vs)
-                self.traces[i].setData([10 * (len_vs - i) / len_vs for i in range(len_vs)], w.vs)
+                self.traces[i].setData(self.get_ts(len(w.vs)), w.vs)
+        plotted_at = time.time()
+        f = int(1 / (plotted_at - self.last_plotted_at))
+        self.app.set_live_info_label(f"fps: {f}")
+        self.last_plotted_at = plotted_at
+
+    @cache
+    def get_ts(self, len_vs: int) -> list[float]:
+        return [10 * i / len_vs for i in range(len_vs)]

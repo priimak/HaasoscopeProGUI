@@ -205,9 +205,13 @@ class ChannelModel(ModelBase):
         if self.board_model.board is not None:
             match value:
                 case ChannelImpedanceModel.FIFTY_OHM:
-                    self.board_model.board.set_channel_input_impedance(channel=0, impedance=InputImpedance.FIFTY_OHM)
+                    self.board_model.board.set_channel_input_impedance(
+                        channel=self.channel_num, impedance=InputImpedance.FIFTY_OHM
+                    )
                 case ChannelImpedanceModel.ONE_MEGA_OHM:
-                    self.board_model.board.set_channel_input_impedance(channel=0, impedance=InputImpedance.ONE_MEGA_OHM)
+                    self.board_model.board.set_channel_input_impedance(
+                        channel=self.channel_num, impedance=InputImpedance.ONE_MEGA_OHM
+                    )
                 case _:
                     raise RuntimeError(f"Invalid channel impedance value {value}")
 

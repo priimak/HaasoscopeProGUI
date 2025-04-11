@@ -18,6 +18,7 @@ class App:
     main_window: Callable[[], MainWindow] = lambda _: None
     exit_application: Callable[[], bool] = lambda: True
     set_connection_status_label: Callable[[str], None] = lambda _: None
+    set_live_info_label: Callable[[str], None] = lambda _: None
     set_plot_color_scheme: Callable[[str], None] = lambda _: None
     channels: list[int] = [0, 1]
     set_trigger_level_from_side_controls: Callable[[float], None] = lambda _: None
