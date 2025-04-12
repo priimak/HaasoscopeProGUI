@@ -1,6 +1,7 @@
+from threading import Lock
+
 from PySide6.QtGui import Qt
 from PySide6.QtWidgets import QSpinBox, QSpacerItem, QSlider, QLabel
-from hspro_api import TriggerType
 from pytide6 import VBoxPanel, VBoxLayout, PushButton, Label, HBoxPanel, ComboBox, W
 
 from hspro.gui.app import App, WorkerMessage
@@ -14,22 +15,18 @@ class TriggerPanel(VBoxPanel):
 
         layout: VBoxLayout = self.layout()
 
+        self.selected_button: str = "Stop"
+        self.selected_button_lock = Lock()
+
         self.stop_button = PushButton("Stop")
         self.single_button = PushButton("Single")
         self.normal_button = PushButton("Normal")
         self.auto_button = PushButton("Auto")
 
         self.set_button_active_appearance(self.stop_button)
-        self.stop_button.clicked.connect(lambda: self.set_button_active_appearance(self.stop_button))
         self.stop_button.clicked.connect(self.disarm)
-
-        self.single_button.clicked.connect(lambda: self.set_button_active_appearance(self.single_button))
         self.single_button.clicked.connect(self.arm_single)
-
-        self.normal_button.clicked.connect(lambda: self.set_button_active_appearance(self.normal_button))
         self.normal_button.clicked.connect(self.arm_normal)
-
-        self.auto_button.clicked.connect(lambda: self.set_button_active_appearance(self.auto_button))
         self.auto_button.clicked.connect(self.arm_auto)
 
         # layout.addWidget(Label("Trigger"))
@@ -96,13 +93,13 @@ class TriggerPanel(VBoxPanel):
         tplabel = Label("Tigger Position")
         tplabel.setContentsMargins(0, 20, 0, 0)
         layout.addWidget(tplabel, alignment=Qt.AlignmentFlag.AlignCenter)
-        self.trigger_position = QSlider(Qt.Orientation.Horizontal)
-        self.trigger_position.setMaximum(0)
-        self.trigger_position.setMaximum(999)
-        self.trigger_position.setSliderPosition(int(app.model.trigger.position * 999))
-        self.trigger_position.valueChanged.connect(self.trigger_position_callback)
+        self.trigger_position_slider = QSlider(Qt.Orientation.Horizontal)
+        self.trigger_position_slider.setMaximum(0)
+        self.trigger_position_slider.setMaximum(3999)
+        self.trigger_position_slider.setSliderPosition(int(app.model.trigger.position * 3999))
+        self.trigger_position_slider.valueChanged.connect(self.trigger_position_callback)
         self.app.set_trigger_pos_from_plot_line = self.set_trigger_pos_from_plot_line
-        layout.addWidget(self.trigger_position)
+        layout.addWidget(self.trigger_position_slider)
 
         layout.addStretch(10)
 
@@ -110,22 +107,12 @@ class TriggerPanel(VBoxPanel):
         self.setPalette(self.app.side_pannels_palette())
 
         self.app.disarm_trigger = self.disarm_trigger_from_worker
-        self.app.arm_single = self.arm_single_from_worker
-        self.app.arm_normal = self.arm_normal_from_worker
-        self.app.arm_auto = self.arm_auto_from_worker
 
     def disarm_trigger_from_worker(self) -> None:
-        self.app.model.trigger.force_arm_trigger(TriggerType.DISABLED)
-        self.set_button_active_appearance(self.stop_button)
-
-    def arm_single_from_worker(self) -> None:
-        self.set_button_active_appearance(self.single_button)
-
-    def arm_normal_from_worker(self) -> None:
-        self.set_button_active_appearance(self.normal_button)
-
-    def arm_auto_from_worker(self) -> None:
-        self.set_button_active_appearance(self.auto_button)
+        with self.selected_button_lock:
+            if self.selected_button != self.stop_button.text():
+                self.set_button_active_appearance(self.stop_button)
+                self.selected_button = self.stop_button.text()
 
     def set_button_active_appearance(self, button: PushButton) -> None:
         for b in [self.stop_button, self.single_button, self.normal_button, self.auto_button]:
@@ -160,8 +147,9 @@ class TriggerPanel(VBoxPanel):
         self.app.model.trigger.delta = self.delta.value()
 
     def trigger_position_callback(self):
-        self.app.model.trigger.position = self.trigger_position.value() / 999.0
-        self.app.set_trigger_pos_from_side_controls(self.app.model.trigger.position)
+        self.app.gui_worker.messages.put(
+            WorkerMessage.SetTriggerPosition(self.trigger_position_slider.value() / 3999.0)
+        )
 
     def trigger_level_callback(self):
         self.app.model.trigger.level = self.trigger_level.value() * 2 / 255 - 1
@@ -174,26 +162,40 @@ class TriggerPanel(VBoxPanel):
             self.trigger_level.setSliderPosition(255 * (self.app.model.trigger.level + 1) / 2)
 
     def set_trigger_pos_from_plot_line(self, value):
-        value = value / 10
         if value != self.app.model.trigger.position:
-            self.app.model.trigger.position = value
-            self.trigger_position.setSliderPosition(int(value * 999))
+            self.trigger_position_slider.setSliderPosition(int(value * 3999))
 
     def set_trigger_level_line_visible(self, visible: bool):
         self.app.set_trigger_level_line_visible(visible)
 
     def disarm(self):
-        self.app.gui_worker.messages.put(WorkerMessage.Disarm())
-        self.set_button_active_appearance(self.stop_button)
+        with self.selected_button_lock:
+            if self.selected_button != self.stop_button.text():
+                self.app.gui_worker.messages.put(WorkerMessage.Disarm())
+                self.set_button_active_appearance(self.stop_button)
+                self.selected_button = self.stop_button.text()
 
     def arm_single(self):
-        self.app.model.trigger.force_arm_trigger(TriggerType.DISABLED)
-        self.app.gui_worker.messages.put(WorkerMessage.ArmSingle(self.app.model.trigger.trigger_type.to_trigger_type()))
+        with self.selected_button_lock:
+            if self.selected_button != self.single_button.text():
+                self.app.gui_worker.messages.put(
+                    WorkerMessage.ArmSingle(self.app.model.trigger.trigger_type.to_trigger_type())
+                )
+                self.set_button_active_appearance(self.single_button)
+                self.selected_button = self.single_button.text()
 
     def arm_normal(self):
-        self.app.model.trigger.force_arm_trigger(TriggerType.DISABLED)
-        self.app.gui_worker.messages.put(WorkerMessage.ArmNormal(self.app.model.trigger.trigger_type.to_trigger_type()))
+        with self.selected_button_lock:
+            if self.selected_button != self.normal_button.text():
+                self.app.gui_worker.messages.put(
+                    WorkerMessage.ArmNormal(self.app.model.trigger.trigger_type.to_trigger_type())
+                )
+                self.set_button_active_appearance(self.normal_button)
+                self.selected_button = self.normal_button.text()
 
     def arm_auto(self):
-        self.app.model.trigger.force_arm_trigger(TriggerType.DISABLED)
-        self.app.gui_worker.messages.put(WorkerMessage.ArmAuto())
+        with self.selected_button_lock:
+            if self.selected_button != self.auto_button.text():
+                self.app.gui_worker.messages.put(WorkerMessage.ArmAuto())
+                self.set_button_active_appearance(self.auto_button)
+                self.selected_button = self.auto_button.text()

@@ -9,7 +9,13 @@ from pyqtgraph import AxisItem, GraphicsLayoutWidget, InfiniteLine, PlotDataItem
 from pyqtgraph.graphicsItems.PlotItem import PlotItem
 from pyqtgraph.graphicsItems.ViewBox import ViewBox
 
-from hspro.gui.app import App
+from hspro.gui.app import App, WorkerMessage
+
+
+class TriggerPositionLine(InfiniteLine):
+    def __init__(self, position: float, pen: QPen):
+        super().__init__(pos=10 * position, movable=True, angle=90, pen=pen)
+        self.setZValue(10)
 
 
 class PlotsPanel(GraphicsLayoutWidget):
@@ -58,14 +64,10 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.trigger_lines_pen.setStyle(Qt.PenStyle.CustomDashLine)
         self.trigger_lines_pen.setDashPattern([8, 8])
 
-        self.trigger_pos_line = InfiniteLine(
-            pos=10 * app.model.trigger.position,
-            movable=True, angle=90, pen=self.trigger_lines_pen
-        )
-        self.trigger_pos_line.setZValue(10)
+        self.trigger_pos_line = TriggerPositionLine(app.model.trigger.position, pen=self.trigger_lines_pen)
         self.plot.addItem(self.trigger_pos_line)
-        self.trigger_pos_line.xChanged.connect(self.set_trigger_pos_from_plot_line)
-        self.app.set_trigger_pos_from_side_controls = lambda pos: self.trigger_pos_line.setPos(10 * pos)
+        self.app.correct_trigger_position = lambda pos: self.trigger_pos_line.setPos(10 * pos)
+        self.trigger_pos_line.sigPositionChangeFinished.connect(self.set_trigger_pos_from_plot_line)
 
         self.trigger_lines_hpen = QPen()
         self.trigger_lines_hpen.setCosmetic(True)
@@ -154,8 +156,13 @@ class PlotsPanel(GraphicsLayoutWidget):
     def set_trigger_level_from_plot_line(self):
         self.app.set_trigger_level_from_plot_line(self.trigger_level_line.y())
 
-    def set_trigger_pos_from_plot_line(self):
-        self.app.set_trigger_pos_from_plot_line(self.trigger_pos_line.x())
+    def set_trigger_pos_from_plot_line(self, line):
+        self.app.gui_worker.messages.put(WorkerMessage.SetTriggerPosition(line.x() / 10))
+        self.app.set_trigger_pos_from_plot_line(line.x() / 10)
+
+    def set_trigger_pos_from_plot_line_live(self):
+        self.app.gui_worker.messages.put(WorkerMessage.SetTriggerPosition(self.trigger_pos_line.x() / 10))
+        self.app.set_trigger_pos_from_plot_line(self.trigger_pos_line.x() / 10)
 
     def mkPen(self, color: str):
         pen = QPen()

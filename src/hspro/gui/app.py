@@ -1,4 +1,5 @@
 import time
+from enum import Enum, auto
 from functools import cache
 from queue import Queue
 from typing import Callable, Optional
@@ -31,9 +32,7 @@ class App:
     set_show_zero_line_state: Callable[[bool], None] = lambda _: None
     set_trigger_level_line_visible: Callable[[bool], None] = lambda _: None
     disarm_trigger: Callable[[], None] = lambda _: None
-    arm_single: Callable[[], None] = lambda _: None
-    arm_normal: Callable[[], None] = lambda _: None
-    arm_auto: Callable[[], None] = lambda _: None
+    correct_trigger_position: Callable[[float], None] = lambda _: None
     plot_waveforms: Callable[[tuple[Optional[Waveform], Optional[Waveform]]], None] = lambda _: None
 
     set_trigger_lines_width: Callable[[int], None] = lambda _: None
@@ -58,10 +57,8 @@ class App:
         self.board_thread_pool = QThreadPool()
         self.gui_worker = GUIWorker(self)
         self.gui_worker.msg_out.disarm_trigger.connect(self.do_disarm_trigger)
-        self.gui_worker.msg_out.arm_single.connect(self.do_arm_single)
-        self.gui_worker.msg_out.arm_normal.connect(self.do_arm_normal)
-        self.gui_worker.msg_out.arm_auto.connect(self.do_arm_auto)
         self.gui_worker.msg_out.plot_waveforms.connect(self.do_plot_waveforms)
+        self.gui_worker.msg_out.correct_trigger_position.connect(self.do_correct_trigger_position)
         self.board_thread_pool.start(self.gui_worker)
 
     @cache
@@ -83,17 +80,11 @@ class App:
     def do_disarm_trigger(self):
         self.disarm_trigger()
 
-    def do_arm_single(self):
-        self.arm_single()
-
-    def do_arm_normal(self):
-        self.arm_normal()
-
-    def do_arm_auto(self):
-        self.arm_auto()
-
     def do_plot_waveforms(self, ws: tuple[Optional[Waveform], Optional[Waveform]]):
         self.plot_waveforms(ws)
+
+    def do_correct_trigger_position(self, position: float):
+        self.correct_trigger_position(position)
 
 
 class WorkerMessage:
@@ -131,16 +122,27 @@ class WorkerMessage:
     class PlotAndDisarm:
         pass
 
+    class SetTriggerPosition:
+        __match_args__ = ("trigger_position",)
+
+        def __init__(self, trigger_position: float):
+            self.trigger_position = trigger_position
+
     class Quit:
         pass
 
 
 class MessagesFromGUIWorker(QObject):
     disarm_trigger = Signal()
-    arm_single = Signal()
-    arm_normal = Signal()
-    arm_auto = Signal()
     plot_waveforms = Signal(tuple)
+    correct_trigger_position = Signal(float)
+
+
+class ArmType(Enum):
+    SINGLE = auto()
+    NORMAL = auto()
+    AUTO = auto()
+    DISARMED = auto()
 
 
 class GUIWorker(QRunnable, ):
@@ -159,34 +161,36 @@ class GUIWorker(QRunnable, ):
 
     def run(self):
         is_armed = False
+        arm_type = ArmType.DISARMED
+        current_trigger_type = TriggerType.DISABLED
         while True:
             message = self.messages.get()
             match message:
                 case WorkerMessage.ArmSingle(trigger_type):
                     if self.drain_queue():
                         break
+                    arm_type = ArmType.SINGLE
+                    current_trigger_type = trigger_type
                     self.app.model.trigger.force_arm_trigger(trigger_type)
                     self.messages.put(WorkerMessage.PlotAndDisarm())
-                    self.msg_out.arm_single.emit()
                     is_armed = True
 
                 case WorkerMessage.ArmNormal(trigger_type, drain_queue):
                     if drain_queue and self.drain_queue():
                         break
-
+                    arm_type = ArmType.NORMAL
+                    current_trigger_type = trigger_type
                     self.app.model.trigger.force_arm_trigger(trigger_type)
                     self.messages.put(WorkerMessage.PlotAndRearmNormal(trigger_type))
-                    if drain_queue:
-                        self.msg_out.arm_normal.emit()
                     is_armed = True
 
                 case WorkerMessage.ArmAuto(drain_queue):
                     if drain_queue and self.drain_queue():
                         break
+                    arm_type = ArmType.AUTO
+                    current_trigger_type = TriggerType.AUTO
                     self.app.model.trigger.force_arm_trigger(TriggerType.AUTO)
                     self.messages.put(WorkerMessage.PlotAndRearmAuto())
-                    if drain_queue:
-                        self.msg_out.arm_auto.emit()
                     is_armed = True
 
                 case WorkerMessage.PlotAndRearmNormal(trigger_type):
@@ -196,11 +200,9 @@ class GUIWorker(QRunnable, ):
                                 w1, w2 = self.app.model.get_waveforms()
                                 self.msg_out.plot_waveforms.emit((w1, w2))
                                 self.messages.put(WorkerMessage.ArmNormal(trigger_type, False))
-                                is_armed = False
 
                             case _:
                                 self.messages.put(WorkerMessage.PlotAndRearmNormal(trigger_type))
-                        time.sleep(0.02)
 
                 case WorkerMessage.PlotAndRearmAuto():
                     if is_armed:
@@ -209,14 +211,18 @@ class GUIWorker(QRunnable, ):
                                 w1, w2 = self.app.model.get_waveforms()
                                 self.msg_out.plot_waveforms.emit((w1, w2))
                                 self.messages.put(WorkerMessage.ArmAuto(False))
-                                is_armed = False
 
                             case _:
                                 self.messages.put(WorkerMessage.PlotAndRearmAuto())
                         time.sleep(0.02)
 
                 case WorkerMessage.Disarm():
+                    if self.drain_queue():
+                        break
                     is_armed = False
+                    arm_type = ArmType.DISARMED
+                    current_trigger_type = TriggerType.DISABLED
+                    self.app.model.trigger.force_arm_trigger(TriggerType.DISABLED)
                     self.msg_out.disarm_trigger.emit()
 
                 case WorkerMessage.PlotAndDisarm():
@@ -226,12 +232,31 @@ class GUIWorker(QRunnable, ):
                             case WaveformAvailable():
                                 w1, w2 = self.app.model.get_waveforms()
                                 self.msg_out.plot_waveforms.emit((w1, w2))
-                                self.messages.put(WorkerMessage.Disarm())
+                                self.app.model.trigger.force_arm_trigger(TriggerType.DISABLED)
+                                self.msg_out.disarm_trigger.emit()
+                                arm_type = ArmType.DISARMED
                                 is_armed = False
 
                             case _:
                                 time.sleep(0.02)
                                 self.messages.put(WorkerMessage.PlotAndDisarm())
+
+                case WorkerMessage.SetTriggerPosition(trigger_position):
+                    if self.drain_queue():
+                        break
+                    if is_armed:
+                        self.app.model.trigger.force_arm_trigger(TriggerType.DISABLED)
+                    self.app.model.trigger.position = trigger_position
+                    self.msg_out.correct_trigger_position.emit(self.app.model.trigger.position)
+                    if is_armed:
+                        # rearm
+                        match arm_type:
+                            case ArmType.SINGLE:
+                                self.messages.put(WorkerMessage.ArmSingle(current_trigger_type))
+                            case ArmType.NORMAL:
+                                self.messages.put(WorkerMessage.ArmNormal(current_trigger_type, True))
+                            case ArmType.AUTO:
+                                self.messages.put(WorkerMessage.ArmAuto(True))
 
                 case WorkerMessage.Quit():
                     break

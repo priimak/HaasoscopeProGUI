@@ -265,13 +265,14 @@ class TriggerModel(ModelBase):
 
     def update_live_trigger_properties(self):
         if self.board_model.board is not None:
-            self.board_model.board.set_trigger_props(
+            self.__level.value = self.board_model.board.set_trigger_props(
                 trigger_level=self.level,
                 trigger_delta=self.delta,
                 trigger_pos=self.position,
                 tot=self.tot,
                 trigger_on_channel=self.__on_channel.value
             )
+            self.__position.value = self.board_model.board.state.trigger_pos
 
     @property
     def on_channel(self) -> int:
