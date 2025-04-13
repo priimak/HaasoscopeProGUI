@@ -31,7 +31,10 @@ class App:
     set_show_grid_state: Callable[[bool], None] = lambda _: None
     set_show_zero_line_state: Callable[[bool], None] = lambda _: None
     set_trigger_level_line_visible: Callable[[bool], None] = lambda _: None
-    disarm_trigger: Callable[[], None] = lambda _: None
+    trigger_disarmed: Callable[[], None] = lambda _: None
+    trigger_armed_single: Callable[[], None] = lambda _: None
+    trigger_armed_normal: Callable[[], None] = lambda _: None
+    trigger_armed_auto: Callable[[], None] = lambda _: None
     correct_trigger_position: Callable[[float], None] = lambda _: None
     plot_waveforms: Callable[[tuple[Optional[Waveform], Optional[Waveform]]], None] = lambda _: None
 
@@ -57,7 +60,10 @@ class App:
         self.board_thread_pool = QThreadPool()
         self.gui_worker = GUIWorker(self)
         self.gui_worker.msg_out.disarm_trigger.connect(self.do_disarm_trigger)
-        self.gui_worker.msg_out.plot_waveforms.connect(self.do_plot_waveforms)
+        self.gui_worker.msg_out.trigger_armed_single.connect(self.do_trigger_armed_single)
+        self.gui_worker.msg_out.trigger_armed_normal.connect(self.do_trigger_armed_normal)
+        self.gui_worker.msg_out.trigger_armed_auto.connect(self.do_trigger_armed_auto)
+        self.gui_worker.msg_out.plot_waveforms.connect(self.do_plot_waveforms, Qt.ConnectionType.QueuedConnection)
         self.gui_worker.msg_out.correct_trigger_position.connect(self.do_correct_trigger_position)
         self.board_thread_pool.start(self.gui_worker)
 
@@ -78,7 +84,16 @@ class App:
         return pen
 
     def do_disarm_trigger(self):
-        self.disarm_trigger()
+        self.trigger_disarmed()
+
+    def do_trigger_armed_single(self):
+        self.trigger_armed_single()
+
+    def do_trigger_armed_normal(self):
+        self.trigger_armed_normal()
+
+    def do_trigger_armed_auto(self):
+        self.trigger_armed_auto()
 
     def do_plot_waveforms(self, ws: tuple[Optional[Waveform], Optional[Waveform]]):
         self.plot_waveforms(ws)
@@ -136,6 +151,9 @@ class MessagesFromGUIWorker(QObject):
     disarm_trigger = Signal()
     plot_waveforms = Signal(tuple)
     correct_trigger_position = Signal(float)
+    trigger_armed_single = Signal()
+    trigger_armed_normal = Signal()
+    trigger_armed_auto = Signal()
 
 
 class ArmType(Enum):
@@ -173,11 +191,15 @@ class GUIWorker(QRunnable, ):
                     current_trigger_type = trigger_type
                     self.app.model.trigger.force_arm_trigger(trigger_type)
                     self.messages.put(WorkerMessage.PlotAndDisarm())
+                    self.msg_out.trigger_armed_single.emit()
                     is_armed = True
 
                 case WorkerMessage.ArmNormal(trigger_type, drain_queue):
-                    if drain_queue and self.drain_queue():
-                        break
+                    if drain_queue:
+                        if self.drain_queue():
+                            break
+                        else:
+                            self.msg_out.trigger_armed_normal.emit()
                     arm_type = ArmType.NORMAL
                     current_trigger_type = trigger_type
                     self.app.model.trigger.force_arm_trigger(trigger_type)
@@ -185,8 +207,12 @@ class GUIWorker(QRunnable, ):
                     is_armed = True
 
                 case WorkerMessage.ArmAuto(drain_queue):
-                    if drain_queue and self.drain_queue():
-                        break
+                    if drain_queue:
+                        if self.drain_queue():
+                            break
+                        else:
+                            self.msg_out.trigger_armed_auto.emit()
+
                     arm_type = ArmType.AUTO
                     current_trigger_type = TriggerType.AUTO
                     self.app.model.trigger.force_arm_trigger(TriggerType.AUTO)

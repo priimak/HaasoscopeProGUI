@@ -106,9 +106,30 @@ class TriggerPanel(VBoxPanel):
         self.setAutoFillBackground(True)
         self.setPalette(self.app.side_pannels_palette())
 
-        self.app.disarm_trigger = self.disarm_trigger_from_worker
+        self.app.trigger_disarmed = self.trigger_disarmed
+        self.app.trigger_armed_single = self.trigger_armed_single
+        self.app.trigger_armed_normal = self.trigger_armed_normal
+        self.app.trigger_armed_auto = self.trigger_armed_auto
 
-    def disarm_trigger_from_worker(self) -> None:
+    def trigger_armed_single(self):
+        with self.selected_button_lock:
+            if self.selected_button != self.single_button.text():
+                self.set_button_active_appearance(self.single_button)
+                self.selected_button = self.single_button.text()
+
+    def trigger_armed_normal(self):
+        with self.selected_button_lock:
+            if self.selected_button != self.normal_button.text():
+                self.set_button_active_appearance(self.normal_button)
+                self.selected_button = self.normal_button.text()
+
+    def trigger_armed_auto(self):
+        with self.selected_button_lock:
+            if self.selected_button != self.auto_button.text():
+                self.set_button_active_appearance(self.auto_button)
+                self.selected_button = self.auto_button.text()
+
+    def trigger_disarmed(self) -> None:
         with self.selected_button_lock:
             if self.selected_button != self.stop_button.text():
                 self.set_button_active_appearance(self.stop_button)
@@ -172,8 +193,6 @@ class TriggerPanel(VBoxPanel):
         with self.selected_button_lock:
             if self.selected_button != self.stop_button.text():
                 self.app.gui_worker.messages.put(WorkerMessage.Disarm())
-                self.set_button_active_appearance(self.stop_button)
-                self.selected_button = self.stop_button.text()
 
     def arm_single(self):
         with self.selected_button_lock:
@@ -181,8 +200,6 @@ class TriggerPanel(VBoxPanel):
                 self.app.gui_worker.messages.put(
                     WorkerMessage.ArmSingle(self.app.model.trigger.trigger_type.to_trigger_type())
                 )
-                self.set_button_active_appearance(self.single_button)
-                self.selected_button = self.single_button.text()
 
     def arm_normal(self):
         with self.selected_button_lock:
@@ -190,12 +207,8 @@ class TriggerPanel(VBoxPanel):
                 self.app.gui_worker.messages.put(
                     WorkerMessage.ArmNormal(self.app.model.trigger.trigger_type.to_trigger_type())
                 )
-                self.set_button_active_appearance(self.normal_button)
-                self.selected_button = self.normal_button.text()
 
     def arm_auto(self):
         with self.selected_button_lock:
             if self.selected_button != self.auto_button.text():
                 self.app.gui_worker.messages.put(WorkerMessage.ArmAuto())
-                self.set_button_active_appearance(self.auto_button)
-                self.selected_button = self.auto_button.text()
