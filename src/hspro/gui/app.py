@@ -184,6 +184,27 @@ class WorkerMessage:
         def __init__(self, dt_per_division: Duration):
             self.dt_per_division = dt_per_division
 
+    class SetVoltagePerDiv:
+        __match_args__ = ("channel", "dV",)
+
+        def __init__(self, channel: int, dV: float):
+            self.channel = channel
+            self.dV = dV
+
+    class SetChannel10x:
+        __match_args__ = ("channel", "ten_x",)
+
+        def __init__(self, channel: int, ten_x: bool):
+            self.channel = channel
+            self.ten_x = ten_x
+
+    class SetChannelActive:
+        __match_args__ = ("channel", "active",)
+
+        def __init__(self, channel: int, active: bool):
+            self.channel = channel
+            self.active = active
+
     class Quit:
         pass
 
@@ -365,6 +386,30 @@ class GUIWorker(QRunnable, ):
                     if is_armed:
                         self.app.model.trigger.force_arm_trigger(TriggerType.DISABLED)
                     self.app.model.time_scale = dt_per_division
+                    self.rearm(is_armed, arm_type, current_trigger_type)
+
+                case WorkerMessage.SetVoltagePerDiv(channel, dV):
+                    if self.drain_queue():
+                        break
+                    if is_armed:
+                        self.app.model.trigger.force_arm_trigger(TriggerType.DISABLED)
+                    self.app.model.channel[channel].dV = dV
+                    self.rearm(is_armed, arm_type, current_trigger_type)
+
+                case WorkerMessage.SetChannel10x(channel, ten_x):
+                    if self.drain_queue():
+                        break
+                    if is_armed:
+                        self.app.model.trigger.force_arm_trigger(TriggerType.DISABLED)
+                    self.app.model.channel[channel].ten_x_probe = ten_x
+                    self.rearm(is_armed, arm_type, current_trigger_type)
+
+                case WorkerMessage.SetChannelActive(channel, active):
+                    if self.drain_queue():
+                        break
+                    if is_armed:
+                        self.app.model.trigger.force_arm_trigger(TriggerType.DISABLED)
+                    self.app.model.channel[channel].active = active
                     self.rearm(is_armed, arm_type, current_trigger_type)
 
                 case WorkerMessage.Quit():

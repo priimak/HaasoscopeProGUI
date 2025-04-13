@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QSpacerItem, QDoubleSpinBox, QColorDialog
 from pytide6 import VBoxPanel, CheckBox, ComboBox, Label, HBoxPanel, W
 from unlib import MetricValue, Scale
 
-from hspro.gui.app import App
+from hspro.gui.app import App, WorkerMessage
 from hspro.gui.model import ChannelCouplingModel, ChannelImpedanceModel
 
 
@@ -29,10 +29,11 @@ class VperDivSpinner(QDoubleSpinBox):
             ten_x_probe=self.app.model.channel[self.channel].ten_x_probe,
             index_offset=-steps
         )
-        self.app.model.channel[self.channel].dV = self.voltage_per_division.to_float(Scale.UNIT)
+        self.app.worker.messages.put(
+            WorkerMessage.SetVoltagePerDiv(self.channel, self.voltage_per_division.to_float(Scale.UNIT)))
 
         # read it back is it might have changed/clipped in the board
-        self.voltage_per_division = MetricValue.value_of(f"{self.app.model.channel[self.channel].dV} V").optimize()
+        # self.voltage_per_division = MetricValue.value_of(f"{self.app.model.channel[self.channel].dV} V").optimize()
         self.setValue(self.voltage_per_division.value)
         self.setSuffix(f" {self.voltage_per_division.scale.to_str()}V/div")
 
@@ -156,7 +157,7 @@ class ChannelsPanel(VBoxPanel):
 
     def channel_active_callback(self, channel: int, channel_config_panel: VBoxPanel) -> Callable[[bool], None]:
         def channel_active(active: bool):
-            self.app.model.channel[channel].active = active
+            self.app.worker.messages.put(WorkerMessage.SetChannelActive(channel, active))
             channel_config_panel.setVisible(active)
             self.app.set_channel_active_state(channel, active)
 
@@ -164,7 +165,7 @@ class ChannelsPanel(VBoxPanel):
 
     def ten_x_callback(self, channel: int) -> Callable[[bool], None]:
         def ten_x_probe(active: bool):
-            self.app.model.channel[channel].ten_x_probe = active
+            self.app.worker.messages.put(WorkerMessage.SetChannel10x(channel, ten_x=active))
 
         return ten_x_probe
 
