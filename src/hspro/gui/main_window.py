@@ -58,7 +58,7 @@ class HSProMainWindow(MainWindow):
         self.app.model.init_board_from_model()
 
     def closeEvent(self, event):
-        self.app.gui_worker.messages.put(WorkerMessage.Quit())
+        self.app.worker.messages.put(WorkerMessage.Quit())
         super().closeEvent(event)
 
     def connect_to_board(self):

@@ -81,8 +81,9 @@ class PlotsPanel(GraphicsLayoutWidget):
             hoverPen=self.trigger_lines_hpen
         )
         self.plot.addItem(self.trigger_level_line)
-        self.trigger_level_line.yChanged.connect(self.set_trigger_level_from_plot_line)
-        self.app.set_trigger_level_from_side_controls = lambda level: self.trigger_level_line.setPos(5 * level)
+        self.app.correct_trigger_level = lambda pos: self.trigger_level_line.setPos(5 * pos)
+        self.trigger_level_line.sigPositionChangeFinished.connect(self.set_trigger_level_from_plot_line)
+
         self.app.set_trigger_level_line_visible = self.trigger_level_line.setVisible
         self.app.set_trigger_lines_width = self.set_trigger_lines_width
         self.app.update_trigger_lines_color = self.update_trigger_lines_color
@@ -153,16 +154,13 @@ class PlotsPanel(GraphicsLayoutWidget):
                 self.zero_h_line.setPen(self.blue_pen)
                 self.app.app_persistence.config.set_value("plot_color_scheme", "dark")
 
-    def set_trigger_level_from_plot_line(self):
-        self.app.set_trigger_level_from_plot_line(self.trigger_level_line.y())
+    def set_trigger_level_from_plot_line(self, line):
+        self.app.worker.messages.put(WorkerMessage.SetTriggerLevel(line.y() / 5))
+        self.app.set_trigger_level_from_plot_line(line.y() / 5)
 
     def set_trigger_pos_from_plot_line(self, line):
-        self.app.gui_worker.messages.put(WorkerMessage.SetTriggerPosition(line.x() / 10))
+        self.app.worker.messages.put(WorkerMessage.SetTriggerPosition(line.x() / 10))
         self.app.set_trigger_pos_from_plot_line(line.x() / 10)
-
-    def set_trigger_pos_from_plot_line_live(self):
-        self.app.gui_worker.messages.put(WorkerMessage.SetTriggerPosition(self.trigger_pos_line.x() / 10))
-        self.app.set_trigger_pos_from_plot_line(self.trigger_pos_line.x() / 10)
 
     def mkPen(self, color: str):
         pen = QPen()

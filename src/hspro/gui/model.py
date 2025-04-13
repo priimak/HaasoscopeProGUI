@@ -9,6 +9,7 @@ from typing import Type, Callable, Optional
 from hspro_api import TriggerType, Waveform
 from hspro_api.board import Board, ChannelCoupling, InputImpedance, WaveformAvailability, WaveformAvailable, \
     WaveformUnavailable
+from hspro_api.time_constants import TimeConstants
 from sprats.config import AppPersistence
 from unlib import Duration, MetricValue
 
@@ -460,25 +461,10 @@ class BoardModel(ModelBase):
         samples_per_row_per_waveform = 20 if two_channel_operation else 40
         num_samples_per_division = samples_per_row_per_waveform * mem_depth / 10
 
-        def get_valid_downsamplemergin_values():
-            if two_channel_operation:
-                return BoardModel.VALID_DOWNSAMPLEMERGIN_VALUES_TWO_CHANNELS
-            else:
-                return BoardModel.VALID_DOWNSAMPLEMERGIN_VALUES_ONE_CHANNEL
-
-        valid_downsamplemergin_values = get_valid_downsamplemergin_values()
-
-        results = []
-        durations: set = set()
-        for downsample in range(32):
-            for downsamplemerging in valid_downsamplemergin_values:
-                dt_s = BoardModel.NATIVE_SAMPLE_PERIOD_S * downsamplemerging * pow(2, downsample)
-                duration = Duration.value_of(f"{dt_s * num_samples_per_division} s").optimize()
-                if duration not in durations:
-                    results.append(duration)
-                    durations.add(duration)
-        results.sort()
-        return results
+        if two_channel_operation:
+            return [(a[2] * num_samples_per_division).optimize() for a in TimeConstants.dt_two_ch]
+        else:
+            return [(a[2] * num_samples_per_division).optimize() for a in TimeConstants.dt_one_ch]
 
     @cache
     def get_time_scale_from_board_parameters(

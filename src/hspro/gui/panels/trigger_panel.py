@@ -51,7 +51,8 @@ class TriggerPanel(VBoxPanel):
         self.trigger_level.setMaximum(255)
         self.trigger_level.setSliderPosition(255 * (app.model.trigger.level + 1) / 2)
         self.trigger_level.valueChanged.connect(self.trigger_level_callback)
-        self.app.set_trigger_level_from_plot_line = self.set_trigger_level_from_plot_line
+        self.app.set_trigger_level_from_plot_line = \
+            lambda value: self.trigger_level.setSliderPosition(255 * (value + 1) / 2)
         trig_level_panel = VBoxPanel([Label("Trig Level"), HBoxPanel([self.trigger_level], margins=0)], margins=0)
         layout.addWidget(HBoxPanel([main_panel, trig_level_panel], margins=0))
 
@@ -143,11 +144,15 @@ class TriggerPanel(VBoxPanel):
                 b.setStyleSheet("background-color: darkred; color: white")
 
     def trigger_channel_callback(self, channel: str):
-        self.app.model.trigger.on_channel = int(channel.replace("Channel", "").strip())
+        on_channel = int(channel.replace("Channel", "").strip())
+        self.app.worker.messages.put(WorkerMessage.SetTriggerOnChannel(on_channel))
         self.app.update_trigger_lines_color()
 
     def trigger_type_callback(self, trigger_type: str):
         self.app.model.trigger.trigger_type = TriggerTypeModel.value_of(trigger_type)
+        self.app.worker.messages.put(WorkerMessage.SetTriggerType(
+            self.app.model.trigger.trigger_type.to_trigger_type()
+        ))
         if self.app.model.trigger.trigger_type == TriggerTypeModel.EXTERNAL_SIGNAL:
             self.trigger_level.setEnabled(False)
             self.channel_selector.setEnabled(False)
@@ -162,25 +167,18 @@ class TriggerPanel(VBoxPanel):
             self.set_trigger_level_line_visible(True)
 
     def tot_change_callback(self):
-        self.app.model.trigger.tot = self.tot.value()
+        self.app.worker.messages.put(WorkerMessage.SetTriggerToT(self.tot.value()))
 
     def delta_change_callback(self):
-        self.app.model.trigger.delta = self.delta.value()
+        self.app.worker.messages.put(WorkerMessage.SetTriggerDelta(self.delta.value()))
 
     def trigger_position_callback(self):
-        self.app.gui_worker.messages.put(
+        self.app.worker.messages.put(
             WorkerMessage.SetTriggerPosition(self.trigger_position_slider.value() / 3999.0)
         )
 
     def trigger_level_callback(self):
-        self.app.model.trigger.level = self.trigger_level.value() * 2 / 255 - 1
-        self.app.set_trigger_level_from_side_controls(self.app.model.trigger.level)
-
-    def set_trigger_level_from_plot_line(self, value):
-        value = value / 5
-        if value != self.app.model.trigger.level:
-            self.app.model.trigger.level = value
-            self.trigger_level.setSliderPosition(255 * (self.app.model.trigger.level + 1) / 2)
+        self.app.worker.messages.put(WorkerMessage.SetTriggerLevel(self.trigger_level.value() * 2 / 255 - 1))
 
     def set_trigger_pos_from_plot_line(self, value):
         if value != self.app.model.trigger.position:
@@ -192,23 +190,23 @@ class TriggerPanel(VBoxPanel):
     def disarm(self):
         with self.selected_button_lock:
             if self.selected_button != self.stop_button.text():
-                self.app.gui_worker.messages.put(WorkerMessage.Disarm())
+                self.app.worker.messages.put(WorkerMessage.Disarm())
 
     def arm_single(self):
         with self.selected_button_lock:
             if self.selected_button != self.single_button.text():
-                self.app.gui_worker.messages.put(
+                self.app.worker.messages.put(
                     WorkerMessage.ArmSingle(self.app.model.trigger.trigger_type.to_trigger_type())
                 )
 
     def arm_normal(self):
         with self.selected_button_lock:
             if self.selected_button != self.normal_button.text():
-                self.app.gui_worker.messages.put(
+                self.app.worker.messages.put(
                     WorkerMessage.ArmNormal(self.app.model.trigger.trigger_type.to_trigger_type())
                 )
 
     def arm_auto(self):
         with self.selected_button_lock:
             if self.selected_button != self.auto_button.text():
-                self.app.gui_worker.messages.put(WorkerMessage.ArmAuto())
+                self.app.worker.messages.put(WorkerMessage.ArmAuto())

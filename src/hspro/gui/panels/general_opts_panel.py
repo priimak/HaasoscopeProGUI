@@ -1,9 +1,8 @@
-# from PyQt5.QtWidgets import QDoubleSpinBox
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDoubleSpinBox, QLabel
 from pytide6 import VBoxPanel, HBoxPanel, W
 
-from hspro.gui.app import App
+from hspro.gui.app import App, WorkerMessage
 
 
 class TimeScaleSpinner(QDoubleSpinBox):
@@ -24,8 +23,7 @@ class TimeScaleSpinner(QDoubleSpinBox):
             current_value=self.dT,
             index_offset=steps
         )
-        self.app.model.time_scale = self.dT
-        self.dT = self.app.model.time_scale  # read back set value as it might be clipped by the board
+        self.app.worker.messages.put(WorkerMessage.SetTimeScale(self.dT))
         self.setValue(self.dT.value)
         self.setSuffix(f" {self.dT.time_unit.to_str()}/div")
 
