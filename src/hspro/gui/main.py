@@ -23,7 +23,7 @@ def main():
         app_name="hspro",
         override_config_if_different_version=True,
         init_config_data={
-            "config_version": 1,
+            "config_version": 2,
             "plot_color_scheme": "light",
             "general": {
                 "highres": True,
@@ -37,7 +37,8 @@ def main():
                 "tot": 2,
                 "delta": 0,
                 "level": 0.0,
-                "position": 0.5
+                "position": 0.5,
+                "auto_frequency": "5 Hz"
             },
             "channels": {
                 "0": {

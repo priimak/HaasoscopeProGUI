@@ -260,6 +260,8 @@ class TriggerModel(ModelBase):
         self.__delta = self.get("/trigger/delta", int)
         self.__level = self.get("/trigger/level", float)
         self.__position = self.get("/trigger/position", float)
+        self.__auto_frequency = self.get("/trigger/auto_frequency", str)
+        self.__max_dt_between_auto_trig_s = self.__auto_freq_to_dt(self.__auto_frequency.value)
 
         # Used only when running without a board in demo mode
         self._model_trigger_type = TriggerType.DISABLED
@@ -274,6 +276,30 @@ class TriggerModel(ModelBase):
                 trigger_on_channel=self.__on_channel.value
             )
             self.__position.value = self.board_model.board.state.trigger_pos
+
+    def __auto_freq_to_dt(self, freq_str: str) -> float:
+        match freq_str:
+            case "2 Hz":
+                return 0.5
+            case "5 Hz":
+                return 0.2
+            case "10 Hz":
+                return 0.1
+            case _:
+                return 0.5
+
+    @property
+    def auto_frequency(self) -> str:
+        return self.__auto_frequency.value
+
+    @auto_frequency.setter
+    def auto_frequency(self, value: str):
+        self.__auto_frequency.value = self.__auto_frequency.setter(value)
+        self.__max_dt_between_auto_trig_s = self.__auto_freq_to_dt(self.__auto_frequency.value)
+
+    @property
+    def max_dt_auto_trig_s(self) -> float:
+        return self.__max_dt_between_auto_trig_s
 
     @property
     def on_channel(self) -> int:
@@ -512,7 +538,11 @@ class BoardModel(ModelBase):
 
     def init_board_from_model(self) -> None:
         if self.board is not None:
-            # following seemingly meaningless code will trigger board write operations if live board is connected
+            # Our auto trigger does not rely on rolling trigger section in the firmware; hence we disable it.
+            # Later this code should be removed after corresponding block in the firmware deleted.
+            self.board.comm.set_rolling(False)
+
+            # Following seemingly meaningless code will trigger board write operations if live board is connected.
             self.time_scale = self.time_scale
             self.highres = self.highres
             self.mem_depth = self.mem_depth

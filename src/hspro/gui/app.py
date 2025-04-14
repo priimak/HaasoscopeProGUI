@@ -122,9 +122,10 @@ class WorkerMessage:
             self.drain_queue = drain_queue
 
     class ArmAuto:
-        __match_args__ = ("drain_queue",)
+        __match_args__ = ("trigger_type", "drain_queue",)
 
-        def __init__(self, drain_queue: bool = True):
+        def __init__(self, trigger_type: TriggerType, drain_queue: bool = True):
+            self.trigger_type = trigger_type
             self.drain_queue = drain_queue
 
     class PlotAndRearmNormal:
@@ -244,6 +245,7 @@ class GUIWorker(QRunnable, ):
         is_armed = False
         arm_type = ArmType.DISARMED
         current_trigger_type = TriggerType.DISABLED
+        last_auto_armed_at_s = 0.0
         while True:
             message = self.messages.get()
             match message:
@@ -269,7 +271,7 @@ class GUIWorker(QRunnable, ):
                     self.messages.put(WorkerMessage.PlotAndRearmNormal(trigger_type))
                     is_armed = True
 
-                case WorkerMessage.ArmAuto(drain_queue):
+                case WorkerMessage.ArmAuto(trigger_type, drain_queue):
                     if drain_queue:
                         if self.drain_queue():
                             break
@@ -277,8 +279,9 @@ class GUIWorker(QRunnable, ):
                             self.msg_out.trigger_armed_auto.emit()
 
                     arm_type = ArmType.AUTO
-                    current_trigger_type = TriggerType.AUTO
-                    self.app.model.trigger.force_arm_trigger(TriggerType.AUTO)
+                    current_trigger_type = trigger_type
+                    self.app.model.trigger.force_arm_trigger(trigger_type)
+                    last_auto_armed_at_s = time.time()
                     self.messages.put(WorkerMessage.PlotAndRearmAuto())
                     is_armed = True
 
@@ -299,9 +302,13 @@ class GUIWorker(QRunnable, ):
                             case WaveformAvailable():
                                 w1, w2 = self.app.model.get_waveforms()
                                 self.msg_out.plot_waveforms.emit((w1, w2))
-                                self.messages.put(WorkerMessage.ArmAuto(False))
+                                self.messages.put(WorkerMessage.ArmAuto(current_trigger_type, False))
 
                             case _:
+                                if (time.time() - last_auto_armed_at_s) > self.app.model.trigger.max_dt_auto_trig_s:
+                                    self.app.model.trigger.force_arm_trigger(TriggerType.AUTO)
+                                    last_auto_armed_at_s = time.time()
+
                                 self.messages.put(WorkerMessage.PlotAndRearmAuto())
                         time.sleep(0.02)
 
@@ -424,4 +431,4 @@ class GUIWorker(QRunnable, ):
                 case ArmType.NORMAL:
                     self.messages.put(WorkerMessage.ArmNormal(current_trigger_type, True))
                 case ArmType.AUTO:
-                    self.messages.put(WorkerMessage.ArmAuto(True))
+                    self.messages.put(WorkerMessage.ArmAuto(current_trigger_type, True))

@@ -209,4 +209,6 @@ class TriggerPanel(VBoxPanel):
     def arm_auto(self):
         with self.selected_button_lock:
             if self.selected_button != self.auto_button.text():
-                self.app.worker.messages.put(WorkerMessage.ArmAuto())
+                self.app.worker.messages.put(WorkerMessage.ArmAuto(
+                    self.app.model.trigger.trigger_type.to_trigger_type()
+                ))

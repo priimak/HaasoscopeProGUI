@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QSpinBox, QLabel
-from pytide6 import Dialog, VBoxLayout, CheckBox, PushButton, HBoxPanel, W
+from pytide6 import Dialog, VBoxLayout, CheckBox, PushButton, HBoxPanel, W, ComboBox
 
 from hspro.gui.app import App
 
@@ -28,6 +28,12 @@ class ReadOutOptionsDialog(Dialog):
         mem_depth_sb.setSingleStep(100)
         mem_depth_sb.setValue(app.model.mem_depth)
 
+        auto_freq_cbox = ComboBox(
+            items=["2 Hz", "5 Hz", "10 Hz"],
+            current_selection=app.model.trigger.auto_frequency,
+            min_width=50
+        )
+
         def on_ok():
             if app.model.highres != highres_cb.isChecked():
                 app.model.highres = highres_cb.isChecked()
@@ -41,6 +47,9 @@ class ReadOutOptionsDialog(Dialog):
             if app.model.mem_depth != mem_depth_sb.value():
                 app.model.mem_depth = mem_depth_sb.value()
 
+            if app.model.trigger.auto_frequency != auto_freq_cbox.currentText():
+                app.model.trigger.auto_frequency = auto_freq_cbox.currentText()
+
             self.close()
 
         self.setLayout(VBoxLayout([
@@ -48,6 +57,8 @@ class ReadOutOptionsDialog(Dialog):
             HBoxPanel([delay_sb, QLabel("Delay")], margins=0),
             HBoxPanel([f_delay_sb, QLabel("F Delay")], margins=0),
             HBoxPanel([mem_depth_sb, QLabel("Memory depth")], margins=0),
+            HBoxPanel([auto_freq_cbox, QLabel("Auto trig. min update frequency")], margins=0),
+
             HBoxPanel([
                 W(HBoxPanel(), stretch=1),
                 PushButton("Ok", on_clicked=on_ok),
