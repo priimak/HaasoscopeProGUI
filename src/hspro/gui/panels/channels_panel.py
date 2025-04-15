@@ -79,7 +79,7 @@ class ChannelsPanel(VBoxPanel):
                         color_selector.color = new_color
                         app.model.channel[color_selector.channel].color = new_color
                         app.set_channel_color(color_selector.channel, new_color)
-                        app.update_trigger_lines_color()
+                        app.update_trigger_lines_color(color_selector.channel)
 
                 return select_color
 

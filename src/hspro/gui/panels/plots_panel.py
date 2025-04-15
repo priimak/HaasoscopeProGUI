@@ -118,7 +118,7 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.plot.setCursor(Qt.CursorShape.CrossCursor)
         self.plot.getAxis('bottom').setZValue(-1)
 
-        self.update_trigger_lines_color()
+        self.update_trigger_lines_color(self.app.model.trigger.on_channel)
 
         self.app.plot_waveforms = self.plot_waveforms
         self.last_plotted_at = time.time()
@@ -185,18 +185,18 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.trigger_pos_line.setPen(self.trigger_lines_pen)
         self.trigger_pos_line.setHoverPen(self.trigger_lines_hpen)
 
-    def update_trigger_lines_color(self):
+    def update_trigger_lines_color(self, on_channel: int):
         match self.trigger_lines_color_map:
             case "Matching Trigger Channel":
-                self.trigger_lines_pen.setColor(self.app.model.channel[self.app.model.trigger.on_channel].color)
-                self.trigger_lines_hpen.setColor(self.app.model.channel[self.app.model.trigger.on_channel].color)
+                self.trigger_lines_pen.setColor(self.app.model.channel[on_channel].color)
+                self.trigger_lines_hpen.setColor(self.app.model.channel[on_channel].color)
             case _:  # Default
                 if self.app.plot_color_scheme == "light":
                     self.trigger_lines_pen.setColor("#101010")
-                    self.trigger_lines_hpen.setColor(self.app.model.channel[self.app.model.trigger.on_channel].color)
+                    self.trigger_lines_hpen.setColor(self.app.model.channel[on_channel].color)
                 elif self.app.plot_color_scheme == "dark":
                     self.trigger_lines_pen.setColor("#FFFFFF")
-                    self.trigger_lines_hpen.setColor(self.app.model.channel[self.app.model.trigger.on_channel].color)
+                    self.trigger_lines_hpen.setColor(self.app.model.channel[on_channel].color)
 
         self.trigger_level_line.setPen(self.trigger_lines_pen)
         self.trigger_level_line.setHoverPen(self.trigger_lines_hpen)

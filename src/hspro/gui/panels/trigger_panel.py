@@ -156,7 +156,7 @@ class TriggerPanel(VBoxPanel):
     def trigger_channel_callback(self, channel: str):
         on_channel = int(channel.replace("Channel", "").strip())
         self.app.worker.messages.put(WorkerMessage.SetTriggerOnChannel(on_channel))
-        self.app.update_trigger_lines_color()
+        self.app.update_trigger_lines_color(on_channel)
 
     def trigger_type_callback(self, trigger_type: str):
         self.app.model.trigger.trigger_type = TriggerTypeModel.value_of(trigger_type)

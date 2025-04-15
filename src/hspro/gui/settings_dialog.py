@@ -26,7 +26,7 @@ class SettingsDialog(Dialog):
 
             app.set_trigger_lines_width(int(app.trigger_lines_width))
             app.set_trigger_lines_color_map(app.trigger_lines_color_map)
-            app.update_trigger_lines_color()
+            app.update_trigger_lines_color(app.model.trigger.on_channel)
             self.close()
 
         self.setLayout(VBoxLayout([

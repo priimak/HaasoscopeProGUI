@@ -40,7 +40,7 @@ class App:
     plot_waveforms: Callable[[tuple[Optional[Waveform], Optional[Waveform]]], None] = lambda _: None
 
     set_trigger_lines_width: Callable[[int], None] = lambda _: None
-    update_trigger_lines_color: Callable[[], None] = lambda _: None
+    update_trigger_lines_color: Callable[[int], None] = lambda _: None
     set_trigger_lines_color_map: Callable[[str], None] = lambda _: None
 
     board_thread_pool: QThreadPool
