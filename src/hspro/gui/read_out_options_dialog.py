@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import QSpinBox, QLabel
 from pytide6 import Dialog, VBoxLayout, CheckBox, PushButton, HBoxPanel, W, ComboBox
 
-from hspro.gui.app import App
+from hspro.gui.app import App, WorkerMessage
 
 
 class ReadOutOptionsDialog(Dialog):
@@ -45,7 +45,7 @@ class ReadOutOptionsDialog(Dialog):
                 app.model.f_delay = f_delay_sb.value()
 
             if app.model.mem_depth != mem_depth_sb.value():
-                app.model.mem_depth = mem_depth_sb.value()
+                app.worker.messages.put(WorkerMessage.SetMemoryDepth(mem_depth_sb.value()))
 
             if app.model.trigger.auto_frequency != auto_freq_cbox.currentText():
                 app.model.trigger.auto_frequency = auto_freq_cbox.currentText()

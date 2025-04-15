@@ -22,12 +22,14 @@ class TriggerPanel(VBoxPanel):
         self.single_button = PushButton("Single")
         self.normal_button = PushButton("Normal")
         self.auto_button = PushButton("Auto")
+        self.force_acq_button = PushButton("Force Acq")
 
         self.set_button_active_appearance(self.stop_button)
         self.stop_button.clicked.connect(self.disarm)
         self.single_button.clicked.connect(self.arm_single)
         self.normal_button.clicked.connect(self.arm_normal)
         self.auto_button.clicked.connect(self.arm_auto)
+        self.force_acq_button.clicked.connect(self.arm_force_acq)
 
         # layout.addWidget(Label("Trigger"))
         t_buttons = HBoxPanel(widgets=[
@@ -35,7 +37,8 @@ class TriggerPanel(VBoxPanel):
                 VBoxPanel(
                     widgets=[
                         Label("Trigger"),
-                        self.stop_button, self.single_button, self.normal_button, self.auto_button
+                        self.stop_button, self.single_button, self.normal_button,
+                        self.auto_button, self.force_acq_button
                     ],
                     margins=0
                 ),
@@ -111,6 +114,7 @@ class TriggerPanel(VBoxPanel):
         self.app.trigger_armed_single = self.trigger_armed_single
         self.app.trigger_armed_normal = self.trigger_armed_normal
         self.app.trigger_armed_auto = self.trigger_armed_auto
+        self.app.trigger_force_acq = self.trigger_force_acq
 
     def trigger_armed_single(self):
         with self.selected_button_lock:
@@ -130,6 +134,12 @@ class TriggerPanel(VBoxPanel):
                 self.set_button_active_appearance(self.auto_button)
                 self.selected_button = self.auto_button.text()
 
+    def trigger_force_acq(self):
+        with self.selected_button_lock:
+            if self.selected_button != self.force_acq_button.text():
+                self.set_button_active_appearance(self.force_acq_button)
+                self.selected_button = self.force_acq_button.text()
+
     def trigger_disarmed(self) -> None:
         with self.selected_button_lock:
             if self.selected_button != self.stop_button.text():
@@ -137,7 +147,7 @@ class TriggerPanel(VBoxPanel):
                 self.selected_button = self.stop_button.text()
 
     def set_button_active_appearance(self, button: PushButton) -> None:
-        for b in [self.stop_button, self.single_button, self.normal_button, self.auto_button]:
+        for b in [self.stop_button, self.single_button, self.normal_button, self.auto_button, self.force_acq_button]:
             if b is button:
                 b.setStyleSheet("background-color: lime; color: black")
             else:
@@ -212,3 +222,8 @@ class TriggerPanel(VBoxPanel):
                 self.app.worker.messages.put(WorkerMessage.ArmAuto(
                     self.app.model.trigger.trigger_type.to_trigger_type()
                 ))
+
+    def arm_force_acq(self):
+        with self.selected_button_lock:
+            if self.selected_button != self.force_acq_button.text():
+                self.app.worker.messages.put(WorkerMessage.ArmForceAcq())

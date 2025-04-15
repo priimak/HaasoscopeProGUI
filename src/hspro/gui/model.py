@@ -349,6 +349,13 @@ class TriggerModel(ModelBase):
     def position(self) -> float:
         return self.__position.value
 
+    @property
+    def position_live(self) -> float:
+        if self.board_model.board is None:
+            return self.__position.value
+        else:
+            return self.board_model.board.state.trigger_pos_live
+
     @position.setter
     def position(self, value: float):
         self.__position.value = self.__position.setter(value)
@@ -541,6 +548,9 @@ class BoardModel(ModelBase):
             # Our auto trigger does not rely on rolling trigger section in the firmware; hence we disable it.
             # Later this code should be removed after corresponding block in the firmware deleted.
             self.board.comm.set_rolling(False)
+
+            # set last memory depth
+            self.board.state.expect_samples = self.mem_depth
 
             # Following seemingly meaningless code will trigger board write operations if live board is connected.
             self.time_scale = self.time_scale

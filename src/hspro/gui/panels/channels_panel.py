@@ -30,7 +30,8 @@ class VperDivSpinner(QDoubleSpinBox):
             index_offset=-steps
         )
         self.app.worker.messages.put(
-            WorkerMessage.SetVoltagePerDiv(self.channel, self.voltage_per_division.to_float(Scale.UNIT)))
+            WorkerMessage.SetVoltagePerDiv(self.channel, self.voltage_per_division.to_float(Scale.UNIT))
+        )
 
         # read it back is it might have changed/clipped in the board
         # self.voltage_per_division = MetricValue.value_of(f"{self.app.model.channel[self.channel].dV} V").optimize()
@@ -125,12 +126,6 @@ class ChannelsPanel(VBoxPanel):
                     CheckBox(on_change=self.ten_x_callback(channel), checked=app.model.channel[channel].ten_x_probe),
                     W(Label("10x probe"), stretch=10, alignment=Qt.AlignmentFlag.AlignLeft)
                 ], margins=(0, 5, 0, 0)),
-                # HBoxPanel(widgets=[
-                #     CheckBox(
-                #         on_change=self.five_x_callback(channel), checked=app.model.channel[channel].five_x_attenuation
-                #     ),
-                #     W(Label("5x attenuation"), stretch=10, alignment=Qt.AlignmentFlag.AlignLeft)
-                # ], margins=(0, 5, 0, 0)),
             ])
 
             channel_panel = VBoxPanel(widgets=[
@@ -169,15 +164,11 @@ class ChannelsPanel(VBoxPanel):
 
         return ten_x_probe
 
-    def five_x_callback(self, channel: int) -> Callable[[bool], None]:
-        def five_x_probe(attenuation: bool):
-            self.app.model.channel[channel].five_x_attenuation = attenuation
-
-        return five_x_probe
-
     def coupling_change_callback(self, channel: int) -> Callable[[str], None]:
         def coupling_change(coupling: str):
-            self.app.model.channel[channel].coupling = ChannelCouplingModel.value_of(coupling)
+            self.app.worker.messages.put(
+                WorkerMessage.SetChannelCoupling(channel, ChannelCouplingModel.value_of(coupling))
+            )
 
         return coupling_change
 
