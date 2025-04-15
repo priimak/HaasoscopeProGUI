@@ -56,6 +56,7 @@ class HSProMainWindow(MainWindow):
         self.app.init()
         self.connect_to_board()
         self.app.model.init_board_from_model()
+        self.app.worker.messages.put(WorkerMessage.ArmAuto(self.app.model.trigger.trigger_type.to_trigger_type()))
 
     def closeEvent(self, event):
         self.app.worker.messages.put(WorkerMessage.Quit())
