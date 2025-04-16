@@ -33,8 +33,6 @@ class VperDivSpinner(QDoubleSpinBox):
             WorkerMessage.SetVoltagePerDiv(self.channel, self.voltage_per_division.to_float(Scale.UNIT))
         )
 
-        # read it back is it might have changed/clipped in the board
-        # self.voltage_per_division = MetricValue.value_of(f"{self.app.model.channel[self.channel].dV} V").optimize()
         self.setValue(self.voltage_per_division.value)
         self.setSuffix(f" {self.voltage_per_division.scale.to_str()}V/div")
 
@@ -44,13 +42,34 @@ class VoltageOffsetSpinner(QDoubleSpinBox):
         super().__init__()
         self.channel = channel
         self.app = app
-        # self.setDecimals(4)
-        self.setValue(app.model.channel[channel].offset_V)
+        self.setMinimum(-1_000_000_000)
+        self.setMaximum(1_000_000_000)
+        self.setDecimals(2)
+        self.offset = MetricValue.value_of(f"{app.model.channel[channel].offset_V} V").optimize()
+        self.setValue(self.offset.value)
+        self.setSuffix(f" {self.offset.scale.to_str()}V")
 
     def stepBy(self, steps):
-        new_val = self.value() + (steps * 0.1)
-        self.app.model.channel[self.channel].offset_V = new_val
-        self.setValue(new_val)
+        self.offset: MetricValue = self.app.model.get_next_valid_offset_value(
+            dV=self.app.model.channel[self.channel].dV,
+            do_oversample=False,
+            current_offset=self.offset,
+            index_offset=steps
+        )
+        self.app.worker.messages.put(WorkerMessage.SetChannelOffset(self.channel, self.offset.to_float(Scale.UNIT)))
+        self.setValue(self.offset.value)
+        self.setSuffix(f" {self.offset.scale.to_str()}V")
+
+    def correctOffsetValue(self):
+        offset_V = self.app.model.channel[self.channel].offset_V
+        self.offset: MetricValue = self.app.model.get_next_valid_offset_value(
+            dV=self.app.model.channel[self.channel].dV,
+            do_oversample=False,
+            current_offset=MetricValue.value_of(f"{offset_V} V"),
+            index_offset=0
+        )
+        self.setValue(self.offset.value)
+        self.setSuffix(f" {self.offset.scale.to_str()}V")
 
 
 class ChannelsPanel(VBoxPanel):
@@ -60,6 +79,7 @@ class ChannelsPanel(VBoxPanel):
         super().__init__(margins=0)
         self.app = app
 
+        offset_spinners = []
         for channel in app.channels:
             channel_name = f"Ch #{channel}"
 
@@ -67,23 +87,23 @@ class ChannelsPanel(VBoxPanel):
             channel_color_selector.setMinimumWidth(100)
             channel_color_selector.setMaximumWidth(100)
 
-            def mk_color_selector(color_selector: Label):
+            def mk_color_selector(color_selector: Label, channel: int):
                 def select_color(ev: QMouseEvent):
                     cdialog = QColorDialog(self)
-                    cdialog.setCurrentColor(app.model.channel[color_selector.channel].color)
+                    cdialog.setCurrentColor(app.model.channel[channel].color)
                     if cdialog.exec_():
                         new_color = cdialog.currentColor().name()
                         color_selector.setStyleSheet(
                             f"background-color: {new_color}; border: 1px solid black;"
                         )
                         color_selector.color = new_color
-                        app.model.channel[color_selector.channel].color = new_color
-                        app.set_channel_color(color_selector.channel, new_color)
-                        app.update_trigger_lines_color(color_selector.channel)
+                        app.model.channel[channel].color = new_color
+                        app.set_channel_color(channel, new_color)
+                        app.update_trigger_lines_color(app.model.trigger.on_channel)
 
                 return select_color
 
-            channel_color_selector.mousePressEvent = mk_color_selector(channel_color_selector)
+            channel_color_selector.mousePressEvent = mk_color_selector(channel_color_selector, channel)
             channel_color_selector.setStyleSheet(
                 f"background-color:{app.model.channel[channel].color}; border: 1px solid black;"
             )
@@ -91,7 +111,7 @@ class ChannelsPanel(VBoxPanel):
 
             vdiv = VperDivSpinner(channel, app)
             voffset = VoltageOffsetSpinner(channel, app)
-            voffset.setEnabled(False)  # TODO: Re-enable me
+            offset_spinners.append(voffset)
 
             channel_config_panel = VBoxPanel(widgets=[
                 HBoxPanel(widgets=[vdiv, W(Label("Scale"), stretch=10)], margins=0),
@@ -149,6 +169,7 @@ class ChannelsPanel(VBoxPanel):
             self.layout().addWidget(channel_panel)
 
         self.layout().addStretch(10)
+        self.app.correct_offset = lambda channel: offset_spinners[channel].correctOffsetValue()
 
     def channel_active_callback(self, channel: int, channel_config_panel: VBoxPanel) -> Callable[[bool], None]:
         def channel_active(active: bool):

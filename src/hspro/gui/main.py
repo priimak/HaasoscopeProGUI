@@ -23,8 +23,8 @@ def main():
         app_name="hspro",
         override_config_if_different_version=True,
         init_config_data={
-            "config_version": 2,
-            "plot_color_scheme": "light",
+            "config_version": 3,
+            "plot_color_scheme": "dark",
             "general": {
                 "highres": True,
                 "mem_depth": 100,

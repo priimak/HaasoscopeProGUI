@@ -513,6 +513,31 @@ class BoardModel(ModelBase):
         return Duration.value_of(f"{dt_s * num_samples_per_division} s").optimize()
 
     @cache
+    def get_valid_offset_values(self, dV: float, do_oversample: bool) -> list[MetricValue]:
+        scaling = 1.5 * dV / 160 * (2 if do_oversample else 1)  # compare to 0 dB gain
+        return [MetricValue.value_of(f"{scaling * n} V").optimize() for n in range(-990, 990, 10)]
+
+    @cache
+    def get_next_valid_offset_value(
+            self,
+            dV: float,
+            do_oversample: bool,
+            current_offset: MetricValue,
+            index_offset: int
+    ) -> MetricValue:
+        valid_values: list[MetricValue] = self.get_valid_offset_values(dV, do_oversample)
+
+        def current_index():
+            for i, d in enumerate(valid_values):
+                if d >= current_offset:
+                    return i
+            return 0
+
+        current_index = current_index()
+        next_index = min(max(current_index + index_offset, 0), len(valid_values) - 1)
+        return valid_values[next_index]
+
+    @cache
     def get_valid_dv_values(self, do_oversample: bool, ten_x_probe: bool) -> list[MetricValue]:
         tenx = 10 if ten_x_probe else 1
 
@@ -562,6 +587,8 @@ class BoardModel(ModelBase):
             self.trigger.update_live_trigger_properties()
             for ch in self.channel:
                 ch.active = ch.active
+
+            for ch in self.channel:
                 ch.offset_V = ch.offset_V
                 ch.dV = ch.dV
                 ch.coupling = ch.coupling

@@ -25,7 +25,7 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.app.set_plot_color_scheme = self.set_plot_color_scheme
         self.pens = [self.mkPen(ch.color) for ch in self.app.model.channel]
 
-        self.trigger_lines_color_map = "Default"
+        self.trigger_lines_color_map = "Matching Trigger Channel"
 
         self.plot: PlotItem = self.addPlot(0, 0)
         self.plot.setMenuEnabled(False)
@@ -118,7 +118,8 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.plot.setCursor(Qt.CursorShape.CrossCursor)
         self.plot.getAxis('bottom').setZValue(-1)
 
-        self.update_trigger_lines_color(self.app.model.trigger.on_channel)
+        self.update_trigger_lines_color(app.model.trigger.on_channel)
+        self.update_trigger_lines_color(app.model.trigger.on_channel)
 
         self.app.plot_waveforms = self.plot_waveforms
         self.last_plotted_at = time.time()
@@ -141,14 +142,12 @@ class PlotsPanel(GraphicsLayoutWidget):
         match plot_color_scheme:
             case "light":
                 self.setBackground("white")
-                self.trigger_lines_pen.setColor("#101010")
                 self.trigger_level_line.setPen(self.trigger_lines_pen)
                 self.trigger_pos_line.setPen(self.trigger_lines_pen)
                 self.zero_h_line.setPen(self.black_pen)
                 self.app.app_persistence.config.set_value("plot_color_scheme", "light")
             case "dark":
                 self.setBackground("black")
-                self.trigger_lines_pen.setColor("#FFFFFF")
                 self.trigger_level_line.setPen(self.trigger_lines_pen)
                 self.trigger_pos_line.setPen(self.trigger_lines_pen)
                 self.zero_h_line.setPen(self.blue_pen)

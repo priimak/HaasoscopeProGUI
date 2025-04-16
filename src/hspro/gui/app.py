@@ -37,6 +37,7 @@ class App:
     trigger_force_acq: Callable[[], None] = lambda _: None
     correct_trigger_position: Callable[[float], None] = lambda _: None
     correct_trigger_level: Callable[[float], None] = lambda _: None
+    correct_offset: Callable[[int], None] = lambda _: None
     plot_waveforms: Callable[[tuple[Optional[Waveform], Optional[Waveform]]], None] = lambda _: None
 
     set_trigger_lines_width: Callable[[int], None] = lambda _: None
@@ -47,7 +48,7 @@ class App:
     worker: "GUIWorker"
 
     trigger_lines_width: int = 1
-    trigger_lines_color_map: str = "Blue"
+    trigger_lines_color_map: str = "Matching Trigger Channel"
     plot_color_scheme: str = "light"
 
     def __init__(self):
@@ -61,6 +62,7 @@ class App:
         self.worker.msg_out.plot_waveforms.connect(self.do_plot_waveforms, Qt.ConnectionType.QueuedConnection)
         self.worker.msg_out.correct_trigger_position.connect(self.do_correct_trigger_position)
         self.worker.msg_out.correct_trigger_level.connect(self.do_correct_trigger_level)
+        self.worker.msg_out.correct_offset.connect(self.do_correct_offset)
         self.board_thread_pool.start(self.worker)
 
     def init(self):
@@ -110,6 +112,9 @@ class App:
 
     def do_correct_trigger_level(self, level: float):
         self.correct_trigger_level(level)
+
+    def do_correct_offset(self, channel: int):
+        self.correct_offset(channel)
 
 
 class WorkerMessage:
@@ -237,6 +242,13 @@ class WorkerMessage:
             self.channel = channel
             self.impedance = impedance
 
+    class SetChannelOffset:
+        __match_args__ = ("channel", "offset_V",)
+
+        def __init__(self, channel: int, offset_V: float):
+            self.channel = channel
+            self.offset_V = offset_V
+
     class SetMemoryDepth:
         __match_args__ = ("mem_depth",)
 
@@ -256,6 +268,7 @@ class MessagesFromGUIWorker(QObject):
     trigger_armed_normal = Signal()
     trigger_armed_auto = Signal()
     trigger_armed_forced_acq = Signal()
+    correct_offset = Signal(int)
 
 
 class ArmType(Enum):
@@ -477,7 +490,15 @@ class GUIWorker(QRunnable, ):
                     if self.drain_queue():
                         break
                     disarm_if_armed()
+                    old_dV = self.app.model.channel[channel].dV
                     self.app.model.channel[channel].dV = dV
+
+                    # update offset value if nessesary
+                    offset_scaling_factor = self.app.model.channel[channel].dV / old_dV
+                    current_offset_V = self.app.model.channel[channel].offset_V
+                    if current_offset_V != 0:
+                        self.app.model.channel[channel].offset_V = current_offset_V * offset_scaling_factor
+                        self.msg_out.correct_offset.emit(channel)
                     rearm_if_required()
 
                 case WorkerMessage.SetChannel10x(channel, ten_x):
@@ -492,6 +513,11 @@ class GUIWorker(QRunnable, ):
                         break
                     disarm_if_armed()
                     self.app.model.channel[channel].active = active
+                    # also trgger update of voltage per division and offset on each channel
+                    for ch in self.app.channels:
+                        self.app.model.channel[ch].offset_V = self.app.model.channel[ch].offset_V
+                    for ch in self.app.channels:
+                        self.app.model.channel[ch].dV = self.app.model.channel[ch].dV
                     rearm_if_required()
 
                 case WorkerMessage.SetChannelCoupling(channel, coupling):
@@ -506,6 +532,13 @@ class GUIWorker(QRunnable, ):
                         break
                     disarm_if_armed()
                     self.app.model.channel[channel].impedance = impedance
+                    rearm_if_required()
+
+                case WorkerMessage.SetChannelOffset(channel, offset_V):
+                    if self.drain_queue():
+                        break
+                    disarm_if_armed()
+                    self.app.model.channel[channel].offset_V = offset_V
                     rearm_if_required()
 
                 case WorkerMessage.SetMemoryDepth(mem_depth):
