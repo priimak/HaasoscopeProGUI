@@ -22,6 +22,16 @@ class ReadOutOptionsDialog(Dialog):
         f_delay_sb.setSingleStep(1)
         f_delay_sb.setValue(app.model.f_delay)
 
+        tot = QSpinBox(self)
+        tot.setMaximum(0)
+        tot.setMaximum(255)
+        tot.setValue(app.model.trigger.tot)
+
+        delta = QSpinBox(self)
+        delta.setMaximum(0)
+        delta.setMaximum(100)
+        delta.setValue(app.model.trigger.delta)
+
         mem_depth_sb = QSpinBox()
         mem_depth_sb.setMinimum(100)
         mem_depth_sb.setMaximum(1000)
@@ -50,12 +60,20 @@ class ReadOutOptionsDialog(Dialog):
             if app.model.trigger.auto_frequency != auto_freq_cbox.currentText():
                 app.model.trigger.auto_frequency = auto_freq_cbox.currentText()
 
+            if app.model.trigger.tot != tot.value():
+                app.worker.messages.put(WorkerMessage.SetTriggerToT(tot.value()))
+
+            if app.model.trigger.delta != delta.value():
+                app.worker.messages.put(WorkerMessage.SetTriggerDelta(delta.value()))
+
             self.close()
 
         self.setLayout(VBoxLayout([
             highres_cb,
             HBoxPanel([delay_sb, QLabel("Delay")], margins=0),
             HBoxPanel([f_delay_sb, QLabel("F Delay")], margins=0),
+            HBoxPanel([tot, QLabel("ToT")], margins=0),
+            HBoxPanel([delta, QLabel("Delta")], margins=0),
             HBoxPanel([mem_depth_sb, QLabel("Memory depth")], margins=0),
             HBoxPanel([auto_freq_cbox, QLabel("Auto trig. min update frequency")], margins=0),
 

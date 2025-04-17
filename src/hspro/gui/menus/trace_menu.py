@@ -32,15 +32,27 @@ class TraceMenu(QMenu):
 
         self.show_grid = QAction("Show &Grid", self)
         self.show_grid.setCheckable(True)
-        self.show_grid.setChecked(True)
+        self.show_grid.setChecked(app.app_persistence.config.get_by_xpath("/show_grid"))
         self.show_grid.triggered.connect(self.set_show_grid_state)
         self.addAction(self.show_grid)
 
-        self.show_zero_line = QAction("Show &Zero Line", self)
-        self.show_zero_line.setCheckable(True)
-        self.show_zero_line.setChecked(True)
-        self.show_zero_line.triggered.connect(self.set_show_zero_line_state)
-        self.addAction(self.show_zero_line)
+        self.show_trig_level_line = QAction("Show &Trigger Level Line", self)
+        self.show_trig_level_line.setCheckable(True)
+        self.show_trig_level_line.setChecked(app.app_persistence.config.get_by_xpath("/show_trigger_level_line"))
+        self.show_trig_level_line.triggered.connect(self.set_show_trigger_level_line)
+        self.addAction(self.show_trig_level_line)
+
+        self.show_trig_pos_line = QAction("Show &Trigger Position Line", self)
+        self.show_trig_pos_line.setCheckable(True)
+        self.show_trig_pos_line.setChecked(app.app_persistence.config.get_by_xpath("/show_trigger_position_line"))
+        self.show_trig_pos_line.triggered.connect(self.set_show_trig_pos_line)
+        self.addAction(self.show_trig_pos_line)
+
+        # self.show_zero_line = QAction("Show &Central Line", self)
+        # self.show_zero_line.setCheckable(True)
+        # self.show_zero_line.setChecked(True)
+        # self.show_zero_line.triggered.connect(self.set_show_zero_line_state)
+        # self.addAction(self.show_zero_line)
 
         plot_color_scheme_menu = self.addMenu("Color &Scheme")
 
@@ -73,8 +85,14 @@ class TraceMenu(QMenu):
     def set_show_grid_state(self, show_grid: bool):
         self.app.set_show_grid_state(show_grid)
 
-    def set_show_zero_line_state(self, show_zero_line: bool):
-        self.app.set_show_zero_line_state(show_zero_line)
+    # def set_show_zero_line_state(self, show_zero_line: bool):
+    #     self.app.set_show_zero_line_state(show_zero_line)
+
+    def set_show_trigger_level_line(self, show_trig_level_line: bool):
+        self.app.set_show_trigger_level_line(show_trig_level_line)
+
+    def set_show_trig_pos_line(self, show_trig_pos_line: bool):
+        self.app.set_show_trig_pos_line(show_trig_pos_line)
 
     def show_readout_options_dialog(self):
         ReadOutOptionsDialog(self.parent(), self.app).exec_()

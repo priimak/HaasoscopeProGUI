@@ -23,8 +23,11 @@ def main():
         app_name="hspro",
         override_config_if_different_version=True,
         init_config_data={
-            "config_version": 3,
+            "config_version": 6,
             "plot_color_scheme": "dark",
+            "show_trigger_level_line": True,
+            "show_trigger_position_line": True,
+            "show_grid": True,
             "general": {
                 "highres": True,
                 "mem_depth": 100,
@@ -35,7 +38,7 @@ def main():
                 "on_channel": 0,
                 "trigger_type": "Rising Edge",
                 "tot": 2,
-                "delta": 0,
+                "delta": 2,
                 "level": 0.0,
                 "position": 0.5,
                 "auto_frequency": "5 Hz"

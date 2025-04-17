@@ -28,7 +28,11 @@ class App:
     set_channel_active_state: Callable[[int, bool], None] = lambda a, b: None
     set_channel_color: Callable[[int, str], None] = lambda a, b: None
     set_show_grid_state: Callable[[bool], None] = lambda _: None
-    set_show_zero_line_state: Callable[[bool], None] = lambda _: None
+    # set_show_zero_line_state: Callable[[bool], None] = lambda _: None
+    set_show_trigger_level_line: Callable[[bool], None] = lambda _: None
+    set_show_trig_pos_line: Callable[[bool], None] = lambda _: None
+    make_trig_level_line_visible_temp: Callable[[bool], None] = lambda _: None
+    make_trig_pos_line_visible_temp: Callable[[bool], None] = lambda _: None
     set_trigger_level_line_visible: Callable[[bool], None] = lambda _: None
     trigger_disarmed: Callable[[], None] = lambda _: None
     trigger_armed_single: Callable[[], None] = lambda _: None

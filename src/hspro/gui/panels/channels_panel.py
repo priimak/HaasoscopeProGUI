@@ -124,7 +124,7 @@ class ChannelsPanel(VBoxPanel):
             channel_config_panel = VBoxPanel(widgets=[
                 HBoxPanel(widgets=[vdiv, W(Label("Scale"), stretch=10)], margins=0),
                 HBoxPanel(
-                    widgets=[voffset, ZeroButton(voffset.resetToZero), W(Label("V (Offset)"), stretch=10)],
+                    widgets=[voffset, ZeroButton(voffset.resetToZero), W(Label("Offset"), stretch=10)],
                     margins=0
                 ),
                 HBoxPanel(

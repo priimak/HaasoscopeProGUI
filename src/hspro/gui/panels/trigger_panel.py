@@ -1,12 +1,40 @@
 from threading import Lock
 
 from PySide6.QtGui import Qt
-from PySide6.QtWidgets import QSpinBox, QSpacerItem, QSlider, QLabel
+from PySide6.QtWidgets import QSpacerItem, QSlider, QLabel
 from pytide6 import VBoxPanel, VBoxLayout, PushButton, Label, HBoxPanel, ComboBox, W
 
 from hspro.gui.app import App, WorkerMessage
 from hspro.gui.buttons import ZeroButton
 from hspro.gui.model import TriggerTypeModel
+
+
+class TrigLevelSlider(QSlider):
+    def __init__(self, app: App):
+        super().__init__(Qt.Orientation.Vertical)
+        self.app = app
+
+    def mousePressEvent(self, ev):
+        super().mousePressEvent(ev)
+        self.app.make_trig_level_line_visible_temp(True)
+
+    def mouseReleaseEvent(self, ev):
+        super().mouseReleaseEvent(ev)
+        self.app.make_trig_level_line_visible_temp(False)
+
+
+class TrigPosSlider(QSlider):
+    def __init__(self, app: App):
+        super().__init__(Qt.Orientation.Horizontal)
+        self.app = app
+
+    def mousePressEvent(self, ev):
+        super().mousePressEvent(ev)
+        self.app.make_trig_pos_line_visible_temp(True)
+
+    def mouseReleaseEvent(self, ev):
+        super().mouseReleaseEvent(ev)
+        self.app.make_trig_pos_line_visible_temp(False)
 
 
 class TriggerPanel(VBoxPanel):
@@ -50,7 +78,7 @@ class TriggerPanel(VBoxPanel):
         main_panel = VBoxPanel(margins=0)
         main_panel.addWidget(t_buttons)
 
-        self.trigger_level = QSlider(Qt.Orientation.Vertical)
+        self.trigger_level = TrigLevelSlider(app)
         self.trigger_level.setMaximum(0)
         self.trigger_level.setMaximum(255)
         self.trigger_level.setSliderPosition(255 * (app.model.trigger.level + 1) / 2)
@@ -71,15 +99,13 @@ class TriggerPanel(VBoxPanel):
         ], margins=0)
         layout.addWidget(HBoxPanel([main_panel, trig_level_panel], margins=0))
 
-        main_panel.addWidget(VBoxPanel([QLabel("Trigger on")], margins=(0, 40, 0, 0)))
+        main_panel.addWidget(VBoxPanel([QLabel("Trigger on")], margins=(0, 70, 0, 0)))
         self.channel_selector = ComboBox(
             items=["Channel 0", "Channel 1"],
             current_selection=f"Channel {app.model.trigger.on_channel}",
             min_width=100,
             on_text_change=self.trigger_channel_callback
         )
-        self.tot = QSpinBox(self)
-        self.delta = QSpinBox(self)
 
         main_panel.addWidget(HBoxPanel(
             widgets=[
@@ -94,22 +120,10 @@ class TriggerPanel(VBoxPanel):
         ))
         main_panel.addWidget(HBoxPanel(widgets=[self.channel_selector], margins=0))
 
-        self.tot.setMaximum(0)
-        self.tot.setMaximum(255)
-        self.tot.setValue(app.model.trigger.tot)
-        self.tot.valueChanged.connect(self.tot_change_callback)
-        main_panel.addWidget(HBoxPanel([self.tot, Label("ToT")], margins=0))
-
-        self.delta.setMaximum(0)
-        self.delta.setMaximum(100)
-        self.delta.setValue(app.model.trigger.delta)
-        self.delta.valueChanged.connect(self.delta_change_callback)
-        main_panel.addWidget(HBoxPanel([self.delta, Label("Delta")], margins=0))
-
         tplabel = Label("Tigger Position")
         tplabel.setContentsMargins(0, 20, 0, 0)
         layout.addWidget(tplabel, alignment=Qt.AlignmentFlag.AlignCenter)
-        self.trigger_position_slider = QSlider(Qt.Orientation.Horizontal)
+        self.trigger_position_slider = TrigPosSlider(app)
         self.trigger_position_slider.setMaximum(0)
         self.trigger_position_slider.setMaximum(3999)
         self.trigger_position_slider.setSliderPosition(int(app.model.trigger.position * 3999))
@@ -186,21 +200,11 @@ class TriggerPanel(VBoxPanel):
         if self.app.model.trigger.trigger_type == TriggerTypeModel.EXTERNAL_SIGNAL:
             self.trigger_level.setEnabled(False)
             self.channel_selector.setEnabled(False)
-            self.tot.setEnabled(False)
-            self.delta.setEnabled(False)
             self.set_trigger_level_line_visible(False)
         else:
             self.trigger_level.setEnabled(True)
             self.channel_selector.setEnabled(True)
-            self.tot.setEnabled(True)
-            self.delta.setEnabled(True)
             self.set_trigger_level_line_visible(True)
-
-    def tot_change_callback(self):
-        self.app.worker.messages.put(WorkerMessage.SetTriggerToT(self.tot.value()))
-
-    def delta_change_callback(self):
-        self.app.worker.messages.put(WorkerMessage.SetTriggerDelta(self.delta.value()))
 
     def trigger_position_callback(self):
         self.app.worker.messages.put(
