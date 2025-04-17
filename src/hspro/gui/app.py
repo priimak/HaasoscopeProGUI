@@ -551,4 +551,5 @@ class GUIWorker(QRunnable, ):
                     rearm_if_required()
 
                 case WorkerMessage.Quit():
+                    self.app.model.cleanup()
                     break

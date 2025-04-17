@@ -402,6 +402,10 @@ class BoardModel(ModelBase):
         self.time_scale = configure_time_scale()
         self.__demo_last_time_waveform_available = time.time()
 
+    def cleanup(self):
+        if self.board is not None:
+            self.board.cleanup()
+
     def link_to_live_board(self, board: Board):
         self.board = board
 
