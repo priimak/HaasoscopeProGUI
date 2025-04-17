@@ -7,6 +7,7 @@ from pytide6 import VBoxPanel, CheckBox, ComboBox, Label, HBoxPanel, W
 from unlib import MetricValue, Scale
 
 from hspro.gui.app import App, WorkerMessage
+from hspro.gui.buttons import ZeroButton
 from hspro.gui.model import ChannelCouplingModel, ChannelImpedanceModel
 
 
@@ -45,6 +46,7 @@ class VoltageOffsetSpinner(QDoubleSpinBox):
         self.setMinimum(-1_000_000_000)
         self.setMaximum(1_000_000_000)
         self.setDecimals(2)
+        self.setMaximumWidth(120)
         self.offset = MetricValue.value_of(f"{app.model.channel[channel].offset_V} V").optimize()
         self.setValue(self.offset.value)
         self.setSuffix(f" {self.offset.scale.to_str()}V")
@@ -59,6 +61,12 @@ class VoltageOffsetSpinner(QDoubleSpinBox):
         self.app.worker.messages.put(WorkerMessage.SetChannelOffset(self.channel, self.offset.to_float(Scale.UNIT)))
         self.setValue(self.offset.value)
         self.setSuffix(f" {self.offset.scale.to_str()}V")
+
+    def resetToZero(self):
+        self.offset = MetricValue.value_of("0 V")
+        self.setValue(self.offset.value)
+        self.setSuffix(f" {self.offset.scale.to_str()}V")
+        self.app.worker.messages.put(WorkerMessage.SetChannelOffset(self.channel, 0))
 
     def correctOffsetValue(self):
         offset_V = self.app.model.channel[self.channel].offset_V
@@ -115,7 +123,10 @@ class ChannelsPanel(VBoxPanel):
 
             channel_config_panel = VBoxPanel(widgets=[
                 HBoxPanel(widgets=[vdiv, W(Label("Scale"), stretch=10)], margins=0),
-                HBoxPanel(widgets=[voffset, W(Label("V (Offset)"), stretch=10)], margins=0),
+                HBoxPanel(
+                    widgets=[voffset, ZeroButton(voffset.resetToZero), W(Label("V (Offset)"), stretch=10)],
+                    margins=0
+                ),
                 HBoxPanel(
                     widgets=[
                         ComboBox(

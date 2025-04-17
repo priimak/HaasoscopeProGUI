@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QSpinBox, QSpacerItem, QSlider, QLabel
 from pytide6 import VBoxPanel, VBoxLayout, PushButton, Label, HBoxPanel, ComboBox, W
 
 from hspro.gui.app import App, WorkerMessage
+from hspro.gui.buttons import ZeroButton
 from hspro.gui.model import TriggerTypeModel
 
 
@@ -56,7 +57,18 @@ class TriggerPanel(VBoxPanel):
         self.trigger_level.valueChanged.connect(self.trigger_level_callback)
         self.app.set_trigger_level_from_plot_line = \
             lambda value: self.trigger_level.setSliderPosition(255 * (value + 1) / 2)
-        trig_level_panel = VBoxPanel([Label("Trig Level"), HBoxPanel([self.trigger_level], margins=0)], margins=0)
+        trig_level_panel = VBoxPanel([
+            Label("Trig Level"),
+            HBoxPanel([
+                self.trigger_level,
+                VBoxPanel([
+                    W(QLabel(), stretch=1),
+                    ZeroButton(lambda: self.app.set_trigger_level_from_plot_line(0)),
+                    W(QLabel(), stretch=1)
+                ], margins=0),
+                W(QLabel(), stretch=1)
+            ], margins=0)
+        ], margins=0)
         layout.addWidget(HBoxPanel([main_panel, trig_level_panel], margins=0))
 
         main_panel.addWidget(VBoxPanel([QLabel("Trigger on")], margins=(0, 40, 0, 0)))
@@ -104,6 +116,14 @@ class TriggerPanel(VBoxPanel):
         self.trigger_position_slider.valueChanged.connect(self.trigger_position_callback)
         self.app.set_trigger_pos_from_plot_line = self.set_trigger_pos_from_plot_line
         layout.addWidget(self.trigger_position_slider)
+        layout.addWidget(HBoxPanel(
+            widgets=[
+                W(QLabel(), stretch=1),
+                ZeroButton(lambda: self.set_trigger_pos_from_plot_line(0.5)),
+                W(QLabel(), stretch=1)
+            ],
+            margins=0
+        ))
 
         layout.addStretch(10)
 
