@@ -42,6 +42,7 @@ class App:
     correct_trigger_position: Callable[[float], None] = lambda _: None
     correct_trigger_level: Callable[[float], None] = lambda _: None
     correct_offset: Callable[[int], None] = lambda _: None
+    correct_dV: Callable[[int], None] = lambda _: None
     plot_waveforms: Callable[[tuple[Optional[Waveform], Optional[Waveform]]], None] = lambda _: None
 
     set_trigger_lines_width: Callable[[int], None] = lambda _: None
@@ -67,6 +68,7 @@ class App:
         self.worker.msg_out.correct_trigger_position.connect(self.do_correct_trigger_position)
         self.worker.msg_out.correct_trigger_level.connect(self.do_correct_trigger_level)
         self.worker.msg_out.correct_offset.connect(self.do_correct_offset)
+        self.worker.msg_out.correct_dV.connect(self.do_correct_dV)
         self.board_thread_pool.start(self.worker)
 
     def init(self):
@@ -119,6 +121,9 @@ class App:
 
     def do_correct_offset(self, channel: int):
         self.correct_offset(channel)
+
+    def do_correct_dV(self, channel: int):
+        self.correct_dV(channel)
 
 
 class WorkerMessage:
@@ -273,6 +278,7 @@ class MessagesFromGUIWorker(QObject):
     trigger_armed_auto = Signal()
     trigger_armed_forced_acq = Signal()
     correct_offset = Signal(int)
+    correct_dV = Signal(int)
 
 
 class ArmType(Enum):
@@ -510,6 +516,7 @@ class GUIWorker(QRunnable, ):
                         break
                     disarm_if_armed()
                     self.app.model.channel[channel].ten_x_probe = ten_x
+                    self.msg_out.correct_dV.emit(channel)
                     rearm_if_required()
 
                 case WorkerMessage.SetChannelActive(channel, active):

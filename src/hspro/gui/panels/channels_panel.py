@@ -18,7 +18,7 @@ class VperDivSpinner(QDoubleSpinBox):
         self.app = app
         self.setMinimum(0)
         self.setMaximum(1000)
-        self.setDecimals(0)
+        self.setMaximumWidth(200)
         self.voltage_per_division = MetricValue.value_of(f"{app.model.channel[channel].dV} V").optimize()
         self.setValue(self.voltage_per_division.value)
         self.setSuffix(f" {self.voltage_per_division.scale.to_str()}V/div")
@@ -34,6 +34,14 @@ class VperDivSpinner(QDoubleSpinBox):
             WorkerMessage.SetVoltagePerDiv(self.channel, self.voltage_per_division.to_float(Scale.UNIT))
         )
 
+        self.setValue(self.voltage_per_division.value)
+        self.setSuffix(f" {self.voltage_per_division.scale.to_str()}V/div")
+
+    def update_due_to_10x_change(self):
+        if self.app.model.channel[self.channel].ten_x_probe:
+            self.voltage_per_division *= 10
+        else:
+            self.voltage_per_division /= 10
         self.setValue(self.voltage_per_division.value)
         self.setSuffix(f" {self.voltage_per_division.scale.to_str()}V/div")
 
@@ -87,6 +95,7 @@ class ChannelsPanel(VBoxPanel):
         super().__init__(margins=0)
         self.app = app
 
+        vdiv_spinners = []
         offset_spinners = []
         for channel in app.channels:
             channel_name = f"Ch #{channel}"
@@ -118,6 +127,7 @@ class ChannelsPanel(VBoxPanel):
             channel_color_selector.channel = channel
 
             vdiv = VperDivSpinner(channel, app)
+            vdiv_spinners.append(vdiv)
             voffset = VoltageOffsetSpinner(channel, app)
             offset_spinners.append(voffset)
 
@@ -181,6 +191,7 @@ class ChannelsPanel(VBoxPanel):
 
         self.layout().addStretch(10)
         self.app.correct_offset = lambda channel: offset_spinners[channel].correctOffsetValue()
+        self.app.correct_dV = lambda channel: vdiv_spinners[channel].update_due_to_10x_change()
 
     def channel_active_callback(self, channel: int, channel_config_panel: VBoxPanel) -> Callable[[bool], None]:
         def channel_active(active: bool):
