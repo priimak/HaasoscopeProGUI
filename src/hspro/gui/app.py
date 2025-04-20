@@ -493,7 +493,14 @@ class GUIWorker(QRunnable, ):
                     if self.drain_queue():
                         break
                     disarm_if_armed()
-                    self.app.model.time_scale = dt_per_division
+                    board_dt_per_division = self.app.model.get_next_valid_time_scale(
+                        two_channel_operation=self.app.model.channel[1].active,
+                        mem_depth=self.app.model.mem_depth,
+                        current_value=dt_per_division,
+                        index_offset=0
+                    )
+                    self.app.model.time_scale = board_dt_per_division
+                    self.app.model.visual_time_scale = dt_per_division
                     rearm_if_required()
 
                 case WorkerMessage.SetVoltagePerDiv(channel, dV):

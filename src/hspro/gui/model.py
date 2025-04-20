@@ -11,7 +11,39 @@ from hspro_api.board import Board, ChannelCoupling, InputImpedance, WaveformAvai
     WaveformUnavailable
 from hspro_api.time_constants import TimeConstants
 from sprats.config import AppPersistence
-from unlib import Duration, MetricValue
+from unlib import Duration, MetricValue, TimeUnit
+
+VISUAL_TIME_PER_DIVISION = [
+    Duration(1, TimeUnit.NS),
+    Duration(2, TimeUnit.NS),
+    Duration(5, TimeUnit.NS),
+    Duration(10, TimeUnit.NS),
+    Duration(20, TimeUnit.NS),
+    Duration(50, TimeUnit.NS),
+    Duration(100, TimeUnit.NS),
+    Duration(200, TimeUnit.NS),
+    Duration(500, TimeUnit.NS),
+    Duration(1, TimeUnit.US),
+    Duration(2, TimeUnit.US),
+    Duration(5, TimeUnit.US),
+    Duration(10, TimeUnit.US),
+    Duration(20, TimeUnit.US),
+    Duration(50, TimeUnit.US),
+    Duration(100, TimeUnit.US),
+    Duration(200, TimeUnit.US),
+    Duration(500, TimeUnit.US),
+    Duration(1, TimeUnit.MS),
+    Duration(2, TimeUnit.MS),
+    Duration(5, TimeUnit.MS),
+    Duration(10, TimeUnit.MS),
+    Duration(20, TimeUnit.MS),
+    Duration(50, TimeUnit.MS),
+    Duration(100, TimeUnit.MS),
+    Duration(200, TimeUnit.MS),
+    Duration(500, TimeUnit.MS),
+    Duration(1, TimeUnit.S),
+    Duration(2, TimeUnit.S)
+]
 
 
 @dataclass
@@ -390,17 +422,11 @@ class BoardModel(ModelBase):
         self.on_channel_active_change: Callable[[], None] = lambda: None
         self.board: Board | None = None
 
-        def configure_time_scale() -> Duration:
-            cfg_time_scale = self.persistence.config.get_by_xpath("/general/time_scale", str)
-            if cfg_time_scale is None:
-                time_scale = self._get_first_valid_time_scale()
-                self.persistence.config.set_by_xpath("/general/time_scale", f"{time_scale}")
-                return time_scale
-            else:
-                return Duration.value_of(cfg_time_scale)
-
-        self.time_scale = configure_time_scale()
+        self.__visual_time_scale = Duration.value_of(
+            self.persistence.config.get_by_xpath("/general/visual_time_scale", str)
+        )
         self.__demo_last_time_waveform_available = time.time()
+        self.__time_scale = Duration.value_of("0s")
 
     def cleanup(self):
         if self.board is not None:
@@ -419,7 +445,15 @@ class BoardModel(ModelBase):
             value = (self.board.set_time_scale(value) * self.board.num_samples_per_division()).optimize()
 
         self.__time_scale = value
-        self.persistence.config.set_by_xpath("/general/time_scale", f"{self.__time_scale}")
+
+    @property
+    def visual_time_scale(self) -> Duration:
+        return self.__visual_time_scale
+
+    @visual_time_scale.setter
+    def visual_time_scale(self, value: Duration):
+        self.__visual_time_scale = value
+        self.persistence.config.set_by_xpath("/general/visual_time_scale", f"{self.__visual_time_scale}")
 
     @property
     def highres(self) -> bool:
@@ -582,11 +616,19 @@ class BoardModel(ModelBase):
             self.board.state.expect_samples = self.mem_depth
 
             # Following seemingly meaningless code will trigger board write operations if live board is connected.
-            self.time_scale = self.time_scale
+
             self.highres = self.highres
             self.mem_depth = self.mem_depth
             self.delay = self.delay
             self.f_delay = self.f_delay
+
+            board_dt_per_division = self.get_next_valid_time_scale(
+                two_channel_operation=self.channel[1].active,
+                mem_depth=self.mem_depth,
+                current_value=self.visual_time_scale,
+                index_offset=0
+            )
+            self.time_scale = board_dt_per_division
 
             self.trigger.update_live_trigger_properties()
             for ch in self.channel:
@@ -628,3 +670,15 @@ class BoardModel(ModelBase):
                 else:
                     retval.append(None)
             return tuple(retval)
+
+    @cache
+    def get_next_valid_visual_time_scale(self, current_value: Duration, index_offset: int) -> Duration:
+        def current_index():
+            for i, d in enumerate(VISUAL_TIME_PER_DIVISION):
+                if d >= current_value:
+                    return i
+            return 0
+
+        current_index = current_index()
+        next_index = min(max(current_index + index_offset, 0), len(VISUAL_TIME_PER_DIVISION) - 1)
+        return VISUAL_TIME_PER_DIVISION[next_index]

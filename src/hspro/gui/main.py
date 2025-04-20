@@ -23,16 +23,17 @@ def main():
         app_name="hspro",
         override_config_if_different_version=True,
         init_config_data={
-            "config_version": 6,
+            "config_version": 7,
             "plot_color_scheme": "dark",
-            "show_trigger_level_line": True,
-            "show_trigger_position_line": True,
+            "show_trigger_level_line": False,
+            "show_trigger_position_line": False,
             "show_grid": True,
             "general": {
                 "highres": True,
                 "mem_depth": 100,
                 "delay": 0,
-                "f_delay": 0
+                "f_delay": 0,
+                "visual_time_scale": "1 us"
             },
             "trigger": {
                 "on_channel": 0,

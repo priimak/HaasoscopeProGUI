@@ -8,6 +8,7 @@ from hspro_api import Waveform
 from pyqtgraph import AxisItem, GraphicsLayoutWidget, InfiniteLine, PlotDataItem, TextItem, ArrowItem
 from pyqtgraph.graphicsItems.PlotItem import PlotItem
 from pyqtgraph.graphicsItems.ViewBox import ViewBox
+from unlib import TimeUnit, Duration
 
 from hspro.gui.app import App, WorkerMessage
 
@@ -295,12 +296,23 @@ class PlotsPanel(GraphicsLayoutWidget):
     def plot_waveforms(self, ws: tuple[Optional[Waveform], Optional[Waveform]]):
         for i, w in enumerate(ws):
             if w is not None:
-                self.traces[i].setData(self.get_ts(len(w.vs)), w.vs)
+                self.traces[i].setData(
+                    self.get_ts(
+                        len_vs=len(w.vs),
+                        t_time=self.trigger_pos_marker.x(),
+                        board_time_scale=self.app.model.time_scale,
+                        visual_time_scale=self.app.model.visual_time_scale
+                    ),
+                    w.vs
+                )
         plotted_at = time.time()
         f = int(1 / (plotted_at - self.last_plotted_at))
         self.app.set_live_info_label(f"fps: {f}")
         self.last_plotted_at = plotted_at
 
     @cache
-    def get_ts(self, len_vs: int) -> list[float]:
-        return [10 * i / len_vs for i in range(len_vs)]
+    def get_ts(
+            self, len_vs: int, t_time: float, board_time_scale: Duration, visual_time_scale: Duration
+    ) -> list[float]:
+        scale = board_time_scale.to_float(TimeUnit.MS) / visual_time_scale.to_float(TimeUnit.MS)
+        return [scale * (10 * i / len_vs - t_time) + t_time for i in range(len_vs)]

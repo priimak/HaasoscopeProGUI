@@ -11,29 +11,19 @@ class TimeScaleSpinner(QDoubleSpinBox):
         self.app = app
         self.setMinimum(0)
         self.setMaximum(1_000_000_000_000.0)
-        # self.setDecimals(4)
-        self.dT = app.model.time_scale
+        self.setDecimals(0)
+        self.dT = app.model.visual_time_scale
         self.setValue(self.dT.value)
         self.setSuffix(f" {self.dT.time_unit.to_str()}/div")
 
     def stepBy(self, steps):
-        self.dT = self.app.model.get_next_valid_time_scale(
-            two_channel_operation=self.app.model.channel[1].active,
-            mem_depth=self.app.model.mem_depth,
-            current_value=self.dT,
-            index_offset=steps
-        )
+        self.dT = self.app.model.get_next_valid_visual_time_scale(current_value=self.dT, index_offset=steps)
         self.app.worker.messages.put(WorkerMessage.SetTimeScale(self.dT))
         self.setValue(self.dT.value)
         self.setSuffix(f" {self.dT.time_unit.to_str()}/div")
 
     def dependencies_changed(self):
-        self.dT = self.app.model.get_next_valid_time_scale(
-            two_channel_operation=self.app.model.channel[1].active,
-            mem_depth=self.app.model.mem_depth,
-            current_value=self.dT,
-            index_offset=0
-        )
+        self.dT = self.app.model.get_next_valid_visual_time_scale(current_value=self.dT, index_offset=0)
         self.setValue(self.dT.value)
         self.setSuffix(f" {self.dT.time_unit.to_str()}/div")
 
