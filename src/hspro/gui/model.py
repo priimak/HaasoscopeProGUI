@@ -629,7 +629,7 @@ class BoardModel(ModelBase):
                 index_offset=0
             )
             self.time_scale = board_dt_per_division
-
+            self.trigger.position = self.trigger.position
             self.trigger.update_live_trigger_properties()
             for ch in self.channel:
                 ch.active = ch.active
