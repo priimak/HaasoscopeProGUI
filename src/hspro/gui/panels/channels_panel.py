@@ -17,6 +17,7 @@ class VperDivSpinner(QDoubleSpinBox):
         self.channel = channel
         self.app = app
         self.setMinimum(0)
+        self.setDecimals(0)
         self.setMaximum(1000)
         self.setMaximumWidth(200)
         self.voltage_per_division = MetricValue.value_of(f"{app.model.channel[channel].dV} V").optimize()

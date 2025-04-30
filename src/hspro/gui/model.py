@@ -577,14 +577,16 @@ class BoardModel(ModelBase):
 
     @cache
     def get_valid_dv_values(self, do_oversample: bool, ten_x_probe: bool) -> list[MetricValue]:
-        tenx = 10 if ten_x_probe else 1
-
-        results = []
-        dbs = [-6, 0, 6, 12, 18, 24, 26]
-        for db in dbs:
-            v2 = 0.1605 * tenx / pow(10, db / 20.) * (2 if do_oversample else 1)
-            results.append(MetricValue.value_of(f"{v2} V").optimize())
-        return results
+        if ten_x_probe:
+            return [
+                MetricValue.value_of("4 V"), MetricValue.value_of("2 V"), MetricValue.value_of("1 V"),
+                MetricValue.value_of("500 mV"), MetricValue.value_of("250 mV"), MetricValue.value_of("100 mV")
+            ]
+        else:
+            return [
+                MetricValue.value_of("400 mV"), MetricValue.value_of("200 mV"), MetricValue.value_of("100 mV"),
+                MetricValue.value_of("50 mV"), MetricValue.value_of("25 mV"), MetricValue.value_of("10 mV")
+            ]
 
     @cache
     def get_next_valid_voltage_scale(

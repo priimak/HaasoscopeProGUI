@@ -1,10 +1,10 @@
 from PySide6.QtWidgets import QRadioButton, QLabel, QVBoxLayout
-from hspro_api.board import Board
+from hspro_api.conn.connection import Connection
 from pytide6 import Dialog, PushButton, W, HBoxPanel
 
 
 class BoardSelectorDialog(Dialog):
-    def __init__(self, parent, boards: list[Board]):
+    def __init__(self, parent, connections: list[Connection]):
         super().__init__(parent, windowTitle="Select board to connect to", modal=True)
 
         layout = QVBoxLayout()
@@ -12,11 +12,11 @@ class BoardSelectorDialog(Dialog):
 
         layout.addWidget(QLabel("Found multiple boards. Please select one to connect to."))
 
-        self.selected_board: Board | None = None
+        self.selected_connection: Connection | None = None
 
         self.radio_buttons = []
-        for board in boards:
-            board_b = QRadioButton(f"#{board.board_num}")
+        for connection in connections:
+            board_b = QRadioButton(f"#{connection.board}")
             board_b.toggled.connect(self.handle_radio_button(board_b))
             self.radio_buttons.append(board_b)
             layout.addWidget(board_b)
@@ -25,9 +25,9 @@ class BoardSelectorDialog(Dialog):
             for rb in self.radio_buttons:
                 if rb.isChecked():
                     board_num = int(rb.text().replace("#", ""))
-                    for board in boards:
-                        if board.board_num == board_num:
-                            self.selected_board = board
+                    for connection in connections:
+                        if connection.board == board_num:
+                            self.selected_connection = connection
                             break
                     break
             self.close()

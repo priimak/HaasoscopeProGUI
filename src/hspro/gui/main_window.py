@@ -1,5 +1,7 @@
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QScrollArea
+from PySide6.QtWidgets import QScrollArea, QMessageBox, QProgressDialog, QProgressBar
+from hspro_api.board import mk_board
+from hspro_api.conn.connection import Connection
 from pytide6 import MainWindow, set_geometry, VBoxPanel, W, HBoxPanel, Label
 from sprats.config import AppPersistence
 
@@ -64,21 +66,56 @@ class HSProMainWindow(MainWindow):
         super().closeEvent(event)
 
     def connect_to_board(self):
-        from hspro_api.board import Board
-        from hspro_api import connect
         from hspro.gui.board_selector_dialog import BoardSelectorDialog
+        from hspro_api.conn.connection_op import connect as raw_connect
 
-        boards: list[Board] = connect(debug=False, debug_spi=False, show_board_call_trace=False)
-        len_boards = len(boards)
-        if len_boards == 1:
-            # just use the only board that we found
-            self.app.model.link_to_live_board(boards[0])
-            self.app.set_connection_status_label("Connected")
+        connections = raw_connect(debug=False)
+        num_connections = len(connections)
+        if num_connections == 0:
+            res = QMessageBox.question(None, "Start in demo mode?", "No HaasoscopePro found. Start in \"demo\" mode?")
+            if res != QMessageBox.StandardButton.Yes:
+                self.exit_app()
 
-        elif len_boards > 1:
+        elif num_connections == 1:
+            self.connect_to_selected_board(connections[0])
+
+        elif num_connections > 1:
             # ask user to select one
-            board_selector_dialog = BoardSelectorDialog(self, boards)
+            board_selector_dialog = BoardSelectorDialog(self, connections)
             board_selector_dialog.exec_()
-            if board_selector_dialog.selected_board is not None:
-                self.app.model.link_to_live_board(board_selector_dialog.selected_board)
-        # pass
+            if board_selector_dialog.selected_connection is None:
+                self.exit_app()
+            else:
+                self.connect_to_selected_board(board_selector_dialog.selected_connection)
+
+    def connect_to_selected_board(self, connection: Connection):
+        progress = QProgressDialog("Initializing oscilloscope", "Abort", 0, 0, None)
+        progress.setWindowTitle("Initializing oscilloscope")
+        bar = QProgressBar(progress)
+        bar.setTextVisible(False)
+        bar.setMaximum(0)
+        bar.setMaximum(10)
+        progress.setBar(bar)
+        progress.setMinimumDuration(0)
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.setValue(0)
+
+        def close_app():
+            if progress.wasCanceled():
+                self.exit_app()
+
+        progress.canceled.connect(close_app)
+
+        self.app.model.link_to_live_board(
+            mk_board(
+                connection, debug=False, debug_spi=False, show_board_call_trace=False,
+                progress_callback=lambda i: progress.setValue(i)
+            )
+        )
+        self.app.set_connection_status_label("Connected")
+        progress.wasCanceled = lambda: False
+        progress.close()
+
+    def exit_app(self):
+        self.app.worker.messages.put(WorkerMessage.Quit())
+        exit(1)
