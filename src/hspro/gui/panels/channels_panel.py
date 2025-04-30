@@ -96,6 +96,8 @@ class ChannelsPanel(VBoxPanel):
         super().__init__(margins=0)
         self.app = app
 
+        self.channel_selectors = []
+        self.spws = []
         vdiv_spinners = []
         offset_spinners = []
         for channel in app.channels:
@@ -188,7 +190,34 @@ class ChannelsPanel(VBoxPanel):
             palette = QPalette()
             palette.setColor(QPalette.ColorRole.Window, "lightblue")
             channel_panel.setPalette(palette)
-            self.layout().addWidget(channel_panel)
+
+            def mk_select_op(ch: int):
+                def select_op(event):
+                    if self.spws[ch].findChildren(VBoxPanel)[1].isVisible():
+                        p = QPalette()
+                        p.setColor(QPalette.ColorRole.Window, "red")
+                        self.spws[ch].setPalette(p)
+
+                        for i, cp in enumerate(self.spws):
+                            if i != ch:
+                                p = QPalette()
+                                p.setColor(QPalette.ColorRole.Window, "lightblue")
+                                cp.setPalette(p)
+
+                return select_op
+
+            select_op_func = mk_select_op(channel)
+            self.channel_selectors.append(select_op_func)
+            channel_panel.mousePressEvent = select_op_func
+
+            cpw = VBoxPanel([channel_panel], margins=3)
+            cpw.setAutoFillBackground(True)
+            p = QPalette()
+            p.setColor(QPalette.ColorRole.Window, "lightblue")
+            cpw.setPalette(p)
+
+            self.spws.append(cpw)
+            self.layout().addWidget(cpw)
 
         self.layout().addStretch(10)
         self.app.correct_offset = lambda channel: offset_spinners[channel].correctOffsetValue()
@@ -199,6 +228,10 @@ class ChannelsPanel(VBoxPanel):
             self.app.worker.messages.put(WorkerMessage.SetChannelActive(channel, active))
             channel_config_panel.setVisible(active)
             self.app.set_channel_active_state(channel, active)
+            if active:
+                self.select_channel(channel)
+            else:
+                self.deselect_channel(channel)
 
         return channel_active
 
@@ -221,3 +254,18 @@ class ChannelsPanel(VBoxPanel):
             self.app.model.channel[channel].impedance = ChannelImpedanceModel.value_of(impedance)
 
         return impedance_change
+
+    def select_channel(self, channel: int):
+        if channel < 0:
+            # unselect all
+            p = QPalette()
+            p.setColor(QPalette.ColorRole.Window, "lightblue")
+            for cp in self.spws:
+                cp.setPalette(p)
+        else:
+            self.channel_selectors[channel](None)
+
+    def deselect_channel(self, channel: int):
+        p = QPalette()
+        p.setColor(QPalette.ColorRole.Window, "lightblue")
+        self.spws[channel].setPalette(p)
