@@ -1,4 +1,5 @@
-import math
+from abc import abstractmethod
+from enum import Enum, auto
 
 # from .. import functions as fn
 # from ..Qt import QtGui, QtWidgets
@@ -11,6 +12,13 @@ __all__ = ['XArrowItem']
 
 from pyqtgraph import mkBrush, mkPen
 from pyqtgraph.Qt import QtWidgets, QtGui
+
+
+class XArrowDirection(Enum):
+    LEFT = auto()
+    RIGHT = auto()
+    UP = auto()
+    DOWN = auto()
 
 
 class XArrowItem(QtWidgets.QGraphicsPathItem):
@@ -52,6 +60,10 @@ class XArrowItem(QtWidgets.QGraphicsPathItem):
 
         # for backward compatibility
         self.setPos(*pos)
+
+    @abstractmethod
+    def direction(self) -> XArrowDirection:
+        pass
 
     def setStyle(self, **opts):
         """
@@ -99,7 +111,7 @@ class XArrowItem(QtWidgets.QGraphicsPathItem):
         opt = dict([(k, self.opts[k]) for k in arrowOpts if k in self.opts])
         tr = QtGui.QTransform()
         tr.rotate(self.opts['angle'])
-        self.path = makeArrowDownPath()
+        self.path = makeXArrowPath(self.direction())
         # down_path = makeArrowPath(**opt)
         # self.path = tr.map(fn.makeArrowPath(**opt))
         # self.path = tr.map(down_path)
@@ -154,37 +166,47 @@ class XArrowItem(QtWidgets.QGraphicsPathItem):
         return pad
 
 
-def makeArrowDownPath() -> QtGui.QPainterPath:
-    path = QtGui.QPainterPath()
-    path.moveTo(-10, 0)
-    path.lineTo(10, 0)
-    path.lineTo(0, 15)
-    path.lineTo(-10, 0)
-    return path
+class XArrowDown(XArrowItem):
+    def direction(self) -> XArrowDirection:
+        return XArrowDirection.DOWN
 
 
-def makeArrowPath(headLen=20, headWidth=None, tipAngle=20, tailLen=20, tailWidth=3, baseAngle=0):
-    """
-    Construct a path outlining an arrow with the given dimensions.
-    The arrow points in the -x direction with tip positioned at 0,0.
-    If *headWidth* is supplied, it overrides *tipAngle* (in degrees).
-    If *tailLen* is None, no tail will be drawn.
-    """
-    if headWidth is None:
-        headWidth = headLen * math.tan(math.radians(tipAngle * 0.5))
+class XArrowUp(XArrowItem):
+    def direction(self) -> XArrowDirection:
+        return XArrowDirection.UP
+
+
+class XArrowLeft(XArrowItem):
+    def direction(self) -> XArrowDirection:
+        return XArrowDirection.LEFT
+
+
+class XArrowRight(XArrowItem):
+    def direction(self) -> XArrowDirection:
+        return XArrowDirection.RIGHT
+
+
+def makeXArrowPath(direction: XArrowDirection) -> QtGui.QPainterPath:
     path = QtGui.QPainterPath()
-    path.moveTo(0, 0)
-    path.lineTo(headLen, -headWidth)
-    if tailLen is None:
-        innerY = headLen - headWidth * math.tan(math.radians(baseAngle))
-        path.lineTo(innerY, 0)
-    else:
-        tailWidth *= 0.5
-        innerY = headLen - (headWidth - tailWidth) * math.tan(math.radians(baseAngle))
-        path.lineTo(innerY, -tailWidth)
-        path.lineTo(headLen + tailLen, -tailWidth)
-        path.lineTo(headLen + tailLen, tailWidth)
-        path.lineTo(innerY, tailWidth)
-    path.lineTo(headLen, headWidth)
-    path.lineTo(0, 0)
+    match direction:
+        case XArrowDirection.DOWN:
+            path.moveTo(-10, 0)
+            path.lineTo(10, 0)
+            path.lineTo(0, 15)
+            path.lineTo(-10, 0)
+        case XArrowDirection.UP:
+            path.moveTo(-10, 0)
+            path.lineTo(10, 0)
+            path.lineTo(0, -15)
+            path.lineTo(-10, 0)
+        case XArrowDirection.LEFT:
+            path.moveTo(0, -10)
+            path.lineTo(0, 10)
+            path.lineTo(-15, 0)
+            path.lineTo(0, -10)
+        case XArrowDirection.RIGHT:
+            path.moveTo(0, -10)
+            path.lineTo(0, 10)
+            path.lineTo(15, 0)
+            path.lineTo(0, -10)
     return path

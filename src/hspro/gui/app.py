@@ -325,6 +325,7 @@ class GUIWorker(QRunnable, ):
 
         while True:
             message = self.messages.get()
+            self.messages.task_done()
             match message:
                 case WorkerMessage.ArmSingle(trigger_type):
                     if self.drain_queue():
@@ -501,6 +502,7 @@ class GUIWorker(QRunnable, ):
                     )
                     self.app.model.time_scale = board_dt_per_division
                     self.app.model.visual_time_scale = dt_per_division
+                    self.msg_out.correct_trigger_position.emit(self.app.model.trigger.position_live)
                     rearm_if_required()
 
                 case WorkerMessage.SetVoltagePerDiv(channel, dV):

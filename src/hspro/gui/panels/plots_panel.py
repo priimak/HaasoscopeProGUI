@@ -5,13 +5,13 @@ from typing import Optional
 from PySide6.QtCore import QPointF
 from PySide6.QtGui import QPen, Qt, QFontDatabase, QColor, QBrush
 from hspro_api import Waveform
-from pyqtgraph import AxisItem, GraphicsLayoutWidget, InfiniteLine, PlotDataItem, TextItem, ArrowItem
+from pyqtgraph import AxisItem, GraphicsLayoutWidget, InfiniteLine, PlotDataItem, TextItem
 from pyqtgraph.graphicsItems.PlotItem import PlotItem
 from pyqtgraph.graphicsItems.ViewBox import ViewBox
 from unlib import Duration
 
 from hspro.gui.app import App, WorkerMessage
-from hspro.gui.gui_ext.arrows import XArrowItem
+from hspro.gui.gui_ext.arrows import XArrowDown, XArrowLeft
 
 
 class TriggerPositionLine(InfiniteLine):
@@ -30,6 +30,8 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.do_show_trig_level_line = self.app.app_persistence.config.get_by_xpath("/show_trigger_level_line", bool)
         self.do_show_trig_pos_line = self.app.app_persistence.config.get_by_xpath("/show_trigger_position_line", bool)
         self.corrected_trigger_position = [0.0]
+        self.corrected_trigger_level = [0.0]
+        self.first_time_pained = True
 
         self.trigger_lines_color_map = "Matching Trigger Channel"
         # self.setContentsMargins(30, 30, 30, 30)
@@ -90,11 +92,17 @@ class PlotsPanel(GraphicsLayoutWidget):
         def correct_trigger_position(pos: float):
             self.corrected_trigger_position.clear()
             self.corrected_trigger_position.append(pos)
-            self.trigger_pos_marker.setPos(
-                self.plot.getViewBox().x() + self.y_axis.getViewBox().x() +
-                self.corrected_trigger_position[0] * self.x_axis.width(),
-                0
-            )
+            v_scale = self.app.model.visual_time_scale.value
+            t_range = 10 * v_scale
+            t_max = t_range * (1 - self.corrected_trigger_position[0])
+            t_min = - t_range * self.corrected_trigger_position[0]
+            current_t_min, current_t_max = self.vbox.viewRange()[0]
+            if current_t_max != t_max or current_t_min != t_min:
+                self.vbox.setXRange(t_min, t_max, padding=0)
+                self.x_axis.setTicks(
+                    [[(i * v_scale, f"{int(i * v_scale)}") for i in range(-10, 11)], []]
+                )
+                self.x_axis.setLabel(f"{self.app.model.visual_time_scale.time_unit.to_str()}")
 
         self.app.correct_trigger_position = correct_trigger_position
         self.trigger_pos_line.sigPositionChangeFinished.connect(self.set_trigger_pos_from_plot_line)
@@ -156,26 +164,23 @@ class PlotsPanel(GraphicsLayoutWidget):
         #     zm.setVisible(self.app.model.channel[i].active)
         #     self.plot.addItem(zm)
 
-        self.trigger_level_marker = ArrowItem(
-            pos=(9.85, 5 * app.model.trigger.level),
-            angle=0, headLen=14, headWidth=10, pxMode=False
-        )
+        self.trigger_level_marker = XArrowLeft(pxMode=True)
         self.trigger_level_marker.setPen(self.trigger_lines_pen)
         self.trigger_level_marker.setBrush(self.trigger_marker_brush)
-        # self.plot.addItem(self.trigger_level_marker)
+        self.scene().addItem(self.trigger_level_marker)
 
-        self.trigger_pos_marker = XArrowItem(
-            angle=0, headLen=14, headWidth=10, pxMode=True
-        )
+        self.trigger_pos_marker = XArrowDown(pxMode=True)
         self.trigger_pos_marker.setPen(self.trigger_lines_pen)
         self.trigger_pos_marker.setBrush(self.trigger_marker_brush)
         self.scene().addItem(self.trigger_pos_marker)
 
-        # self.trigger_pos_marker.setPos(QPoint(200, 14))
-
         def correct_trigger_level_line(pos):
             self.trigger_level_line.setPos(5 * pos)
-            self.trigger_level_marker.setY(5 * pos)
+            self.corrected_trigger_level.clear()
+            self.corrected_trigger_level.append(pos)
+            self.trigger_level_marker.setY(
+                self.plot.getViewBox().y() + self.y_axis.getViewBox().y() + (1 - (pos + 1) / 2) * self.y_axis.height()
+            )
 
         self.app.correct_trigger_level = correct_trigger_level_line
 
@@ -184,10 +189,10 @@ class PlotsPanel(GraphicsLayoutWidget):
 
         self.value_label = TextItem("", color=(0, 0, 0), border=(0, 0, 0), fill=(255, 255, 255))
         self.value_label.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
-        self.value_label.setPos(0.1, 4.9)
+        self.value_label.setPos(15, 5)
         self.value_label.setZValue(5)
         self.value_label.setVisible(False)
-        self.plot.addItem(self.value_label)
+        self.scene().addItem(self.value_label)
 
         self.setMouseTracking(True)
         self.plot.scene().sigMouseMoved.connect(self.on_mouse_moved)
@@ -205,8 +210,9 @@ class PlotsPanel(GraphicsLayoutWidget):
         if self.plot.sceneBoundingRect().contains(pos):
             self.value_label.setVisible(True)
             mousePoint = self.plot.vb.mapSceneToView(pos)
-            label = f"{mousePoint.x():.3}, {mousePoint.y():.3}"
-            self.value_label.setText(label + " " * (13 - len(label)))
+            label = (f"t={mousePoint.x():.2f} {self.app.model.visual_time_scale.time_unit.to_str()}, "
+                     f"Ch0={mousePoint.y():.3f}")
+            self.value_label.setText(label + " " * (27 - len(label)))
         else:
             self.value_label.setVisible(False)
 
@@ -318,24 +324,6 @@ class PlotsPanel(GraphicsLayoutWidget):
                 )
                 self.traces[i].setData(ts, w.vs)
 
-        if ts is not None:
-            v_scale = self.app.model.visual_time_scale.value
-            t_range = 10 * v_scale
-            t_max = t_range * (1 - self.corrected_trigger_position[0])
-            t_min = - t_range * self.corrected_trigger_position[0]
-            current_t_min, current_t_max = self.vbox.viewRange()[0]
-            if current_t_max != t_max or current_t_min != t_min:
-                self.vbox.setXRange(t_min, t_max, padding=0)
-                self.x_axis.setTicks(
-                    [[(i * v_scale, f"{int(i * v_scale)}") for i in range(-10, 11)], []]
-                )
-                self.x_axis.setLabel(f"{self.app.model.visual_time_scale.time_unit.to_str()}")
-                self.trigger_pos_marker.setPos(
-                    self.plot.getViewBox().x() + self.y_axis.getViewBox().x() +
-                    self.corrected_trigger_position[0] * self.x_axis.width(),
-                    0
-                )
-
         plotted_at = time.time()
         f = int(1 / (plotted_at - self.last_plotted_at))
         self.app.set_live_info_label(f"fps: {f}")
@@ -356,4 +344,18 @@ class PlotsPanel(GraphicsLayoutWidget):
                 self.plot.getViewBox().x() + self.y_axis.getViewBox().x() +
                 self.corrected_trigger_position[0] * self.x_axis.width(),
                 0
+            )
+
+    def paintEvent(self, ev):
+        super().paintEvent(ev)
+        if self.first_time_pained:
+            self.trigger_pos_marker.setPos(
+                self.plot.getViewBox().x() + self.y_axis.getViewBox().x() +
+                self.corrected_trigger_position[0] * self.x_axis.width(),
+                0
+            )
+            self.trigger_level_marker.setPos(
+                self.plot.getViewBox().x() + self.y_axis.getViewBox().x() + self.x_axis.width() + 5,
+                self.plot.getViewBox().y() + self.y_axis.getViewBox().y() +
+                (1 - (self.corrected_trigger_level[0] + 1) / 2) * self.y_axis.height()
             )

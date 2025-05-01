@@ -58,8 +58,10 @@ class HSProMainWindow(MainWindow):
         self.app.init()
         self.connect_to_board()
         self.app.model.init_board_from_model()
-        self.app.correct_trigger_position(self.app.model.trigger.position_live)
-        self.app.worker.messages.put(WorkerMessage.ArmAuto(self.app.model.trigger.trigger_type.to_trigger_type()))
+        self.app.worker.messages.put(
+            WorkerMessage.ArmAuto(self.app.model.trigger.trigger_type.to_trigger_type(), drain_queue=False)
+        )
+        self.app.worker.messages.put(WorkerMessage.SetTriggerPosition(self.app.model.trigger.position_live))
 
     def closeEvent(self, event):
         self.app.worker.messages.put(WorkerMessage.Quit())
