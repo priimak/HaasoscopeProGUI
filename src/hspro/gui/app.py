@@ -26,8 +26,13 @@ class App:
     set_trigger_level_from_plot_line: Callable[[float], None] = lambda _: None
     set_trigger_pos_from_plot_line: Callable[[float], None] = lambda _: None
     set_channel_active_state: Callable[[int, bool], None] = lambda a, b: None
+    set_selected_channel: Callable[[int], None] = lambda _: None
+    select_channel_in_plots: Callable[[int], None] = lambda _: None
+    deselect_channel: Callable[[int], None] = lambda _: None
+    remove_all_y_axis_ticks_labels: Callable[[], None] = lambda: None
     set_channel_color: Callable[[int, str], None] = lambda a, b: None
     set_show_grid_state: Callable[[bool], None] = lambda _: None
+    set_show_y_axis_labels: Callable[[bool], None] = lambda _: None
     # set_show_zero_line_state: Callable[[bool], None] = lambda _: None
     set_show_trigger_level_line: Callable[[bool], None] = lambda _: None
     set_show_trig_pos_line: Callable[[bool], None] = lambda _: None
@@ -44,6 +49,7 @@ class App:
     correct_offset: Callable[[int], None] = lambda _: None
     correct_dV: Callable[[int], None] = lambda _: None
     plot_waveforms: Callable[[tuple[Optional[Waveform], Optional[Waveform]]], None] = lambda _: None
+    update_y_axis_ticks: Callable[[int], None] = lambda _: None
 
     set_trigger_lines_width: Callable[[int], None] = lambda _: None
     update_trigger_lines_color: Callable[[int], None] = lambda _: None
@@ -65,6 +71,7 @@ class App:
         self.worker.msg_out.trigger_armed_auto.connect(self.do_trigger_armed_auto)
         self.worker.msg_out.trigger_armed_forced_acq.connect(self.do_trigger_armed_forced_acq)
         self.worker.msg_out.plot_waveforms.connect(self.do_plot_waveforms, Qt.ConnectionType.QueuedConnection)
+        self.worker.msg_out.update_y_ticks.connect(self.do_update_y_axis_ticks)
         self.worker.msg_out.correct_trigger_position.connect(self.do_correct_trigger_position)
         self.worker.msg_out.correct_trigger_level.connect(self.do_correct_trigger_level)
         self.worker.msg_out.correct_offset.connect(self.do_correct_offset)
@@ -113,6 +120,9 @@ class App:
     def do_plot_waveforms(self, ws: tuple[Optional[Waveform], Optional[Waveform]]):
         self.plot_waveforms(ws)
 
+    def do_update_y_axis_ticks(self, channel: int) -> None:
+        self.update_y_axis_ticks(channel)
+
     def do_correct_trigger_position(self, position: float):
         self.correct_trigger_position(position)
 
@@ -124,6 +134,15 @@ class App:
 
     def do_correct_dV(self, channel: int):
         self.correct_dV(channel)
+
+    def do_select_channel(self, channel: int):
+        self.set_selected_channel(channel)
+
+    def do_deselect_channel(self, channel: int):
+        self.deselect_channel(channel)
+
+    def do_remove_all_y_axis_ticks_labels(self):
+        self.remove_all_y_axis_ticks_labels()
 
 
 class WorkerMessage:
@@ -173,6 +192,12 @@ class WorkerMessage:
 
     class PlotAndDisarm:
         pass
+
+    class SelectChannel:
+        __match_args__ = ("channel",)
+
+        def __init__(self, channel: int):
+            self.channel = channel
 
     class SetTriggerPosition:
         __match_args__ = ("trigger_position",)
@@ -279,6 +304,7 @@ class MessagesFromGUIWorker(QObject):
     trigger_armed_forced_acq = Signal()
     correct_offset = Signal(int)
     correct_dV = Signal(int)
+    update_y_ticks = Signal(int)
 
 
 class ArmType(Enum):
@@ -446,6 +472,9 @@ class GUIWorker(QRunnable, ):
                                 time.sleep(0.01)
                                 self.messages.put(WorkerMessage.PlotAndDisarm())
 
+                case WorkerMessage.SelectChannel(channel):
+                    self.app.do_select_channel(channel)
+
                 case WorkerMessage.SetTriggerPosition(trigger_position):
                     if self.drain_queue():
                         break
@@ -518,6 +547,8 @@ class GUIWorker(QRunnable, ):
                     if current_offset_V != 0:
                         self.app.model.channel[channel].offset_V = current_offset_V * offset_scaling_factor
                         self.msg_out.correct_offset.emit(channel)
+                    self.msg_out.update_y_ticks.emit(channel)
+
                     rearm_if_required()
 
                 case WorkerMessage.SetChannel10x(channel, ten_x):
@@ -526,6 +557,7 @@ class GUIWorker(QRunnable, ):
                     disarm_if_armed()
                     self.app.model.channel[channel].ten_x_probe = ten_x
                     self.msg_out.correct_dV.emit(channel)
+                    self.msg_out.update_y_ticks.emit(channel)
                     rearm_if_required()
 
                 case WorkerMessage.SetChannelActive(channel, active):
@@ -538,6 +570,30 @@ class GUIWorker(QRunnable, ):
                         self.app.model.channel[ch].offset_V = self.app.model.channel[ch].offset_V
                     for ch in self.app.channels:
                         self.app.model.channel[ch].dV = self.app.model.channel[ch].dV
+                    if active:
+                        self.app.do_select_channel(channel)
+                    else:
+                        # find some other channel to select
+                        def get_channel_to_select() -> int | None:
+                            for ch in self.app.channels:
+                                if self.app.model.channel[ch].active:
+                                    return ch
+                            return None
+
+                        channel_to_select = get_channel_to_select()
+                        if channel_to_select is not None:
+                            self.app.do_select_channel(channel_to_select)
+
+                        # deselect all other channels; maybe all
+                        for ch in self.app.channels:
+                            if ch != channel_to_select:
+                                self.app.do_deselect_channel(ch)
+
+                        # check if we have any active channels; if not, then remove y-axis ticks labels
+                        if True not in [ch.active for ch in self.app.model.channel]:
+                            # remove y-axis ticks labels
+                            self.app.do_remove_all_y_axis_ticks_labels()
+
                     rearm_if_required()
 
                 case WorkerMessage.SetChannelCoupling(channel, coupling):
@@ -559,6 +615,7 @@ class GUIWorker(QRunnable, ):
                         break
                     disarm_if_armed()
                     self.app.model.channel[channel].offset_V = offset_V
+                    self.msg_out.update_y_ticks.emit(channel)
                     rearm_if_required()
 
                 case WorkerMessage.SetMemoryDepth(mem_depth):

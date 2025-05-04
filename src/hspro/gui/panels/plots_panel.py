@@ -2,7 +2,7 @@ import time
 from functools import cache
 from typing import Optional
 
-from PySide6.QtCore import QPointF
+from PySide6.QtCore import QPointF, Signal
 from PySide6.QtGui import QPen, Qt, QFontDatabase, QColor, QBrush
 from hspro_api import Waveform
 from pyqtgraph import AxisItem, GraphicsLayoutWidget, InfiniteLine, PlotDataItem, TextItem
@@ -21,6 +21,8 @@ class TriggerPositionLine(InfiniteLine):
 
 
 class PlotsPanel(GraphicsLayoutWidget):
+    update_y_ticks_color = Signal(int)
+
     def __init__(self, parent, app: App):
         super().__init__(parent)
         self.app = app
@@ -32,11 +34,15 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.corrected_trigger_position = [0.0]
         self.corrected_trigger_level = [0.0]
         self.first_time_pained = True
+        self.show_y_axis_labels_p = [app.app_persistence.config.get_by_xpath("/show_y_axis_labels")]
+        self.selected_channel = [0]
 
         self.trigger_lines_color_map = "Matching Trigger Channel"
-        # self.setContentsMargins(30, 30, 30, 30)
 
         self.plot: PlotItem = self.addPlot(0, 0)
+        self.plot.autoBtn.setEnabled(False)
+        self.plot.autoBtn.setVisible(False)
+        self.plot.autoBtn.show = lambda: None
         self.plot.setMenuEnabled(False)
 
         show_grid_p = self.app.app_persistence.config.get_by_xpath("/show_grid")
@@ -66,8 +72,52 @@ class PlotsPanel(GraphicsLayoutWidget):
                 []
             ]
         )
-        # self.y_axis.showLabel(True)
-        # self.y_axis.setLabel("V")
+
+        self.app.remove_all_y_axis_ticks_labels = lambda: self.y_axis.setTicks(
+            [
+                [(-5, ""), (-4, ""), (-3, ""), (-2, ""), (-1, ""), (0, ""), (1, ""), (2, ""), (3, ""), (4, ""),
+                 (5, "")],
+                []
+            ]
+        )
+
+        self.y_axis.setTextPen()
+
+        def update_y_axis_ticks(ch: int | None) -> None:
+            if not self.show_y_axis_labels_p[0]:
+                self.y_axis.setTicks(
+                    [
+                        [(-5, ""), (-4, ""), (-3, ""), (-2, ""), (-1, ""), (0, ""), (1, ""), (2, ""), (3, ""), (4, ""),
+                         (5, "")],
+                        []
+                    ]
+                )
+            else:
+                if ch is not None:
+                    self.selected_channel.clear()
+                    self.selected_channel.append(ch)
+
+                ch = self.selected_channel[0]
+                dV = self.app.model.channel[ch].dV  # * (10 if self.app.model.channel[ch].ten_x_probe else 1)
+                offset_V = self.app.model.channel[ch].offset_V
+                ticks = []
+                for i in range(-5, 6):
+                    vi = offset_V + dV * i
+                    ticks.append((i, f"{vi:7.2f} V"))
+                self.y_axis.setTicks([ticks, []])
+                self.update_y_ticks_color.emit(ch)
+
+        self.app.update_y_axis_ticks = update_y_axis_ticks
+
+        self.update_y_ticks_color.connect(lambda channel: self.y_axis.setTextPen(self.pens[channel]))
+
+        def show_y_axis_labels(show: bool):
+            self.show_y_axis_labels_p.clear()
+            self.show_y_axis_labels_p.append(show)
+            self.app.update_y_axis_ticks(None)
+            app.app_persistence.config.set_by_xpath("/show_y_axis_labels", show)
+
+        self.app.set_show_y_axis_labels = show_y_axis_labels
 
         self.vbox: ViewBox = self.x_axis.linkedView()
         self.vbox.setMouseEnabled(False, False)
@@ -260,6 +310,8 @@ class PlotsPanel(GraphicsLayoutWidget):
     def channel_color_changed(self, channel: int, color: str):
         self.pens[channel].setColor(color)
         self.traces[channel].setPen(self.pens[channel])
+        self.app.worker.messages.put(WorkerMessage.SelectChannel(channel))
+        self.y_axis.setTextPen(self.pens[channel])
 
     def make_trigger_line_visible(self, visible: bool):
         if self.do_show_trig_level_line:

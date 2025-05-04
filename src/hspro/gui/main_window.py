@@ -61,6 +61,13 @@ class HSProMainWindow(MainWindow):
         self.app.worker.messages.put(
             WorkerMessage.ArmAuto(self.app.model.trigger.trigger_type.to_trigger_type(), drain_queue=False)
         )
+
+        # find channel to select and select it
+        for i, ch in enumerate(self.app.model.channel):
+            if ch.active:
+                self.app.worker.messages.put(WorkerMessage.SelectChannel(i))
+                break
+
         self.app.worker.messages.put(WorkerMessage.SetTriggerPosition(self.app.model.trigger.position_live))
 
     def closeEvent(self, event):
