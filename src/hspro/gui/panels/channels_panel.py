@@ -107,7 +107,7 @@ class ChannelsPanel(VBoxPanel):
         super().__init__(margins=0)
         self.app = app
         self.app.deselect_channel = self.deselect_channel
-
+        self.setAutoFillBackground(True)
         self.channel_selectors = []
         self.spws = []
         vdiv_spinners = []
@@ -122,11 +122,10 @@ class ChannelsPanel(VBoxPanel):
 
                     for i, cp in enumerate(self.spws):
                         if i != ch:
-                            p = QPalette()
-                            p.setColor(QPalette.ColorRole.Window, "lightblue")
-                            cp.setPalette(p)
+                            cp.setPalette(self.app.side_pannels_palette())
 
                     app.update_y_axis_ticks(ch)
+                    self.app.selected_channel = ch
 
             return select_op
 
@@ -220,19 +219,15 @@ class ChannelsPanel(VBoxPanel):
 
             channel_panel.setObjectName("ChannelPanel")
             channel_panel.setAutoFillBackground(True)
-            palette = QPalette()
-            palette.setColor(QPalette.ColorRole.Window, "lightblue")
-            channel_panel.setPalette(palette)
+            channel_panel.setPalette(self.app.side_pannels_palette())
 
             select_op_func = mk_select_op(channel)
             self.channel_selectors.append(select_op_func)
             channel_panel.mousePressEvent = select_op_func
 
-            cpw = VBoxPanel([channel_panel], margins=3)
+            cpw = VBoxPanel([channel_panel], margins=4)
             cpw.setAutoFillBackground(True)
-            p = QPalette()
-            p.setColor(QPalette.ColorRole.Window, "lightblue")
-            cpw.setPalette(p)
+            cpw.setPalette(self.app.side_pannels_palette())
 
             self.spws.append(cpw)
             self.layout().addWidget(cpw)
@@ -277,17 +272,17 @@ class ChannelsPanel(VBoxPanel):
 
         return impedance_change
 
-    def select_channel(self, channel: int):
-        if channel < 0:
-            # unselect all
-            p = QPalette()
-            p.setColor(QPalette.ColorRole.Window, "lightblue")
-            for cp in self.spws:
-                cp.setPalette(p)
-        else:
-            self.channel_selectors[channel](None)
+    def set_color_scheme(self, color_scheme: str):
+        match color_scheme:
+            case "light":
+                p = QPalette()
+                p.setColor(QPalette.ColorRole.Window, "white")
+                self.setPalette(p)
+            case "dark":
+                p = QPalette()
+                p.setColor(QPalette.ColorRole.Window, "black")
+                self.setPalette(p)
 
     def deselect_channel(self, channel: int):
-        p = QPalette()
-        p.setColor(QPalette.ColorRole.Window, "lightblue")
-        self.spws[channel].setPalette(p)
+        self.spws[channel].setPalette(self.app.side_pannels_palette())
+        self.app.selected_channel = None

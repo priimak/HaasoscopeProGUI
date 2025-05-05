@@ -27,7 +27,6 @@ class App:
     set_trigger_pos_from_plot_line: Callable[[float], None] = lambda _: None
     set_channel_active_state: Callable[[int, bool], None] = lambda a, b: None
     set_selected_channel: Callable[[int], None] = lambda _: None
-    select_channel_in_plots: Callable[[int], None] = lambda _: None
     deselect_channel: Callable[[int], None] = lambda _: None
     remove_all_y_axis_ticks_labels: Callable[[], None] = lambda: None
     set_channel_color: Callable[[int, str], None] = lambda a, b: None
@@ -61,6 +60,7 @@ class App:
     trigger_lines_width: int = 1
     trigger_lines_color_map: str = "Matching Trigger Channel"
     plot_color_scheme: str = "light"
+    selected_channel: int | None = None
 
     def __init__(self):
         self.board_thread_pool = QThreadPool()
@@ -80,16 +80,12 @@ class App:
 
     def init(self):
         plot_color_scheme: str | None = self.app_persistence.config.get_value("plot_color_scheme", str)
-        if plot_color_scheme is None:
-            plot_color_scheme = "light"
-            self.app_persistence.config.set_value("plot_color_scheme", plot_color_scheme)
-        self.set_plot_color_scheme(plot_color_scheme)
         self.plot_color_scheme = plot_color_scheme
 
     @cache
     def side_pannels_palette(self):
         palette = QPalette()
-        palette.setColor(QPalette.ColorRole.Window, "lightblue")
+        palette.setColor(QPalette.ColorRole.Window, "#90e0ef")
         return palette
 
     @cache
@@ -137,9 +133,11 @@ class App:
 
     def do_select_channel(self, channel: int):
         self.set_selected_channel(channel)
+        self.selected_channel = channel
 
     def do_deselect_channel(self, channel: int):
         self.deselect_channel(channel)
+        self.selected_channel = None
 
     def do_remove_all_y_axis_ticks_labels(self):
         self.remove_all_y_axis_ticks_labels()
@@ -322,11 +320,7 @@ class GUIWorker(QRunnable, ):
         self.msg_out = MessagesFromGUIWorker()
 
     def drain_queue(self) -> bool:
-        quit = False
-        while not self.messages.empty():
-            if isinstance(self.messages.get(), WorkerMessage.Quit):
-                quit = True
-        return quit
+        return self.messages.is_shutdown
 
     def run(self):
         is_armed = False
@@ -629,4 +623,5 @@ class GUIWorker(QRunnable, ):
 
                 case WorkerMessage.Quit():
                     self.app.model.cleanup()
+                    self.messages.shutdown(True)
                     break

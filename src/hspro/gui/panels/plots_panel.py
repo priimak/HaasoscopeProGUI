@@ -26,7 +26,6 @@ class PlotsPanel(GraphicsLayoutWidget):
     def __init__(self, parent, app: App):
         super().__init__(parent)
         self.app = app
-        self.app.set_plot_color_scheme = self.set_plot_color_scheme
         self.pens = [self.mkPen(ch.color) for ch in self.app.model.channel]
         self.brushes = [QBrush(ch.color) for ch in self.app.model.channel]
         self.do_show_trig_level_line = self.app.app_persistence.config.get_by_xpath("/show_trigger_level_line", bool)
@@ -257,13 +256,15 @@ class PlotsPanel(GraphicsLayoutWidget):
 
     def on_mouse_moved(self, evt: QPointF):
         pos = evt
-        if self.plot.sceneBoundingRect().contains(pos):
-            self.value_label.setVisible(True)
+        if self.plot.sceneBoundingRect().contains(pos) and self.app.selected_channel is not None:
+            if not self.value_label.isVisible():
+                self.value_label.setVisible(True)
             mousePoint = self.plot.vb.mapSceneToView(pos)
-            label = (f"t={mousePoint.x():.2f} {self.app.model.visual_time_scale.time_unit.to_str()}, "
-                     f"Ch0={mousePoint.y():.3f}")
-            self.value_label.setText(label + " " * (27 - len(label)))
-        else:
+            channel = self.app.model.channel[self.app.selected_channel]
+            v = channel.dV * mousePoint.y() + channel.offset_V
+            label = f"{v:.3f} [V] @ {mousePoint.x():.2f} [{self.app.model.visual_time_scale.time_unit.to_str()}]"
+            self.value_label.setText(f"{label:<28}")
+        elif self.value_label.isVisible():
             self.value_label.setVisible(False)
 
     def leaveEvent(self, ev):
@@ -277,13 +278,13 @@ class PlotsPanel(GraphicsLayoutWidget):
                 self.trigger_level_line.setPen(self.trigger_lines_pen)
                 self.trigger_pos_line.setPen(self.trigger_lines_pen)
                 # self.zero_h_line.setPen(self.black_pen)
-                self.app.app_persistence.config.set_value("plot_color_scheme", "light")
+                self.app.app_persistence.config.set_by_xpath("/plot_color_scheme", "light")
             case "dark":
                 self.setBackground("black")
                 self.trigger_level_line.setPen(self.trigger_lines_pen)
                 self.trigger_pos_line.setPen(self.trigger_lines_pen)
                 # self.zero_h_line.setPen(self.blue_pen)
-                self.app.app_persistence.config.set_value("plot_color_scheme", "dark")
+                self.app.app_persistence.config.set_by_xpath("/plot_color_scheme", "dark")
 
     def set_trigger_level_from_plot_line(self, line):
         self.app.worker.messages.put(WorkerMessage.SetTriggerLevel(line.y() / 5))

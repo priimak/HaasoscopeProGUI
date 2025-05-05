@@ -23,7 +23,7 @@ def main():
         app_name="hspro",
         override_config_if_different_version=True,
         init_config_data={
-            "config_version": 8,
+            "config_version": 12,
             "plot_color_scheme": "dark",
             "show_trigger_level_line": False,
             "show_trigger_position_line": False,
@@ -48,9 +48,9 @@ def main():
             "channels": {
                 "0": {
                     "active": True,
-                    "color": "#ff0000",
+                    "color": "#ffee2e",
                     "offset_V": 0.0,
-                    "dV": 0.160,
+                    "dV": 0.2,
                     "coupling": ChannelCouplingModel.DC.value,
                     "impedance": ChannelImpedanceModel.FIFTY_OHM.value,
                     "ten_x_probe": False,
@@ -58,9 +58,9 @@ def main():
                 },
                 "1": {
                     "active": False,
-                    "color": "#0000ff",
+                    "color": "#40cc1a",
                     "offset_V": 0.0,
-                    "dV": 0.160,
+                    "dV": 0.2,
                     "coupling": ChannelCouplingModel.DC.value,
                     "impedance": ChannelImpedanceModel.FIFTY_OHM.value,
                     "ten_x_probe": False,

@@ -1,4 +1,5 @@
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import QScrollArea, QMessageBox, QProgressDialog, QProgressBar
 from hspro_api.board import mk_board
 from hspro_api.conn.connection import Connection
@@ -20,6 +21,8 @@ class HSProMainWindow(MainWindow):
     def __init__(self, screen_dim: tuple[int, int], app_persistence: AppPersistence):
         super().__init__(objectName="MainWindow", windowTitle="Haasoscope Pro GUI")
 
+        self.setStyleSheet("QMainWindow { background-color: #000000; }")
+
         self.app = App()
         self.app.model = BoardModel(app_persistence)
         self.app.app_persistence = app_persistence
@@ -31,19 +34,25 @@ class HSProMainWindow(MainWindow):
         self.menu_bar = self.setMenuBar(MainMenuBar(self.app))
 
         self.glw = PlotsPanel(self, self.app)
+        self.app.set_plot_color_scheme = self.color_scheme
 
-        right_panel = VBoxPanel(
+        self.right_panel = VBoxPanel(
             widgets=[TriggerPanel(self.app), GeneralOptionsPanel(self.app), W(Label(""), stretch=10)],
             margins=0
         )
-        channels_area = QScrollArea()
-        channels_area.setWidget(ChannelsPanel(self.app))
-        channels_area.setMinimumWidth(ChannelsPanel.min_width + 15)
-        channels_area.setWidgetResizable(True)
-        channels_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        channels_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        top_controls_panel = HBoxPanel([channels_area, right_panel], margins=0)
-        controls_panel = VBoxPanel([top_controls_panel], margins=0)
+        self.right_panel.setAutoFillBackground(True)
+        self.channels_area = QScrollArea()
+        self.channels_area.setStyleSheet("border: none;")
+        self.channels_panel = ChannelsPanel(self.app)
+        self.channels_area.setWidget(self.channels_panel)
+        self.channels_area.setMinimumWidth(ChannelsPanel.min_width + 15)
+        self.channels_area.setWidgetResizable(True)
+        self.channels_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.channels_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        self.top_controls_panel = HBoxPanel([self.channels_area, self.right_panel], margins=0)
+        self.top_controls_panel.setAutoFillBackground(True)
+        controls_panel = VBoxPanel([self.top_controls_panel], margins=0)
 
         main_panel = HBoxPanel(widgets=[
             W(self.glw, stretch=1), controls_panel
@@ -51,7 +60,7 @@ class HSProMainWindow(MainWindow):
         self.setCentralWidget(
             VBoxPanel(
                 widgets=[W(main_panel, stretch=1), InfoPanel(self.app)],
-                spacing=0, margins=(5, 5, 5, 1)
+                spacing=0, margins=(0, 0, 0, 0)
             )
         )
 
@@ -62,6 +71,9 @@ class HSProMainWindow(MainWindow):
             WorkerMessage.ArmAuto(self.app.model.trigger.trigger_type.to_trigger_type(), drain_queue=False)
         )
 
+        plot_color_scheme: str | None = self.app.app_persistence.config.get_value("plot_color_scheme", str)
+        self.color_scheme(plot_color_scheme)
+
         # find channel to select and select it
         for i, ch in enumerate(self.app.model.channel):
             if ch.active:
@@ -69,6 +81,30 @@ class HSProMainWindow(MainWindow):
                 break
 
         self.app.worker.messages.put(WorkerMessage.SetTriggerPosition(self.app.model.trigger.position_live))
+
+    def color_scheme(self, color_scheme: str):
+        self.glw.set_plot_color_scheme(color_scheme)
+        match color_scheme:
+            case "light":
+                self.setStyleSheet("QMainWindow { background-color: #ffffff; }")
+                self.channels_area.setStyleSheet("QScrollArea { background-color: #ffffff; }")
+            case "dark":
+                self.setStyleSheet("QMainWindow { background-color: #000000; }")
+                self.channels_area.setStyleSheet("QScrollArea { background-color: #000000; }")
+
+        self.channels_panel.set_color_scheme(color_scheme)
+        match color_scheme:
+            case "light":
+                palette = QPalette()
+                palette.setColor(QPalette.ColorRole.Window, "white")
+                self.top_controls_panel.setPalette(palette)
+                self.right_panel.setPalette(palette)
+
+            case "dark":
+                palette = QPalette()
+                palette.setColor(QPalette.ColorRole.Window, "black")
+                self.top_controls_panel.setPalette(palette)
+                self.right_panel.setPalette(palette)
 
     def closeEvent(self, event):
         self.app.worker.messages.put(WorkerMessage.Quit())

@@ -1,3 +1,4 @@
+from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import QHBoxLayout, QLabel
 from pytide6 import Panel, RichTextLabel
 
@@ -17,3 +18,8 @@ class InfoPanel(Panel[QHBoxLayout]):
         # connect dispatching methods in App to relevant functions
         app.set_connection_status_label = self.connection_status_label.setText
         app.set_live_info_label = self.live_info_label.setText
+
+        p = QPalette()
+        p.setColor(QPalette.ColorRole.Window, "white")
+        self.setPalette(p)
+        self.setAutoFillBackground(True)
