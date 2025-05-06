@@ -11,7 +11,7 @@ from pyqtgraph.graphicsItems.ViewBox import ViewBox
 from unlib import Duration
 
 from hspro.gui.app import App, WorkerMessage
-from hspro.gui.gui_ext.arrows import XArrowDown, XArrowLeft
+from hspro.gui.gui_ext.arrows import XArrowDown, XArrowLeft, XArrowRight
 
 
 class TriggerPositionLine(InfiniteLine):
@@ -22,6 +22,7 @@ class TriggerPositionLine(InfiniteLine):
 
 class PlotsPanel(GraphicsLayoutWidget):
     update_y_ticks_color = Signal(int)
+    update_zero_line_position = Signal(float)
 
     def __init__(self, parent, app: App):
         super().__init__(parent)
@@ -91,24 +92,36 @@ class PlotsPanel(GraphicsLayoutWidget):
                         []
                     ]
                 )
+                if ch is not None:
+                    self.selected_channel.clear()
+                    self.selected_channel.append(ch)
+
+                ch = self.selected_channel[0]
+                dV = self.app.model.channel[ch].dV
+                offset_V = self.app.model.channel[ch].offset_V
+                self.update_y_ticks_color.emit(ch)
+                self.update_zero_line_position.emit(offset_V / dV)
             else:
                 if ch is not None:
                     self.selected_channel.clear()
                     self.selected_channel.append(ch)
 
                 ch = self.selected_channel[0]
-                dV = self.app.model.channel[ch].dV  # * (10 if self.app.model.channel[ch].ten_x_probe else 1)
+                dV = self.app.model.channel[ch].dV
                 offset_V = self.app.model.channel[ch].offset_V
                 ticks = []
                 for i in range(-5, 6):
-                    vi = offset_V + dV * i
+                    vi = dV * i - offset_V
                     ticks.append((i, f"{vi:7.2f} V"))
                 self.y_axis.setTicks([ticks, []])
                 self.update_y_ticks_color.emit(ch)
+                self.update_zero_line_position.emit(offset_V / dV)
 
         self.app.update_y_axis_ticks = update_y_axis_ticks
 
         self.update_y_ticks_color.connect(lambda channel: self.y_axis.setTextPen(self.pens[channel]))
+        self.update_y_ticks_color.connect(lambda channel: self.zero_line.setPen(self.pens[channel]))
+        self.update_y_ticks_color.connect(lambda channel: self.zero_marker.setBrush(self.brushes[channel]))
 
         def show_y_axis_labels(show: bool):
             self.show_y_axis_labels_p.clear()
@@ -175,6 +188,7 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.app.set_trigger_level_line_visible = self.make_trigger_line_visible
         self.app.set_show_trigger_level_line = self.set_show_trigger_level_line
         self.app.set_show_trig_pos_line = self.set_show_trig_pos_line
+        self.app.set_show_zero_line = self.set_show_zero_line
 
         def trig_level_line_temp_vis(visible: bool):
             if visible or not self.do_show_trig_level_line:
@@ -212,6 +226,30 @@ class PlotsPanel(GraphicsLayoutWidget):
         #     zm.setBrush(self.brushes[i])
         #     zm.setVisible(self.app.model.channel[i].active)
         #     self.plot.addItem(zm)
+
+        self.zero_line_pen = QPen()
+        self.zero_line_pen.setCosmetic(True)
+        self.zero_line_pen.setColor(QColor(0xFF, 0, 0xff, 100))
+        self.zero_line_pen.setWidth(3)
+
+        self.zero_line = InfiniteLine(
+            pos=0, movable=False, angle=0  # , pen=self.zero_line_pen
+        )
+        self.zero_line.setVisible(self.app.app_persistence.config.get_by_xpath("/show_zero_line", bool))
+        self.update_zero_line_position.connect(self.zero_line.setY)
+
+        self.plot.addItem(self.zero_line)
+
+        self.zero_marker = XArrowRight(pxMode=True)
+        self.zero_marker.setBrush(self.trigger_marker_brush)
+        self.zero_marker.setX(30)
+        self.scene().addItem(self.zero_marker)
+
+        self.update_zero_line_position.connect(
+            lambda y: self.zero_marker.setY(
+                self.plot.getViewBox().y() + self.y_axis.getViewBox().y() - (y - 5) / 10 * self.y_axis.height()
+            )
+        )
 
         self.trigger_level_marker = XArrowLeft(pxMode=True)
         self.trigger_level_marker.setPen(self.trigger_lines_pen)
@@ -254,6 +292,8 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.app.plot_waveforms = self.plot_waveforms
         self.last_plotted_at = time.time()
 
+        self.app.select_channel_in_plot = self.select_channel
+
     def on_mouse_moved(self, evt: QPointF):
         pos = evt
         if self.plot.sceneBoundingRect().contains(pos) and self.app.selected_channel is not None:
@@ -270,6 +310,10 @@ class PlotsPanel(GraphicsLayoutWidget):
     def leaveEvent(self, ev):
         super().leaveEvent(ev)
         self.value_label.setVisible(False)
+
+    def select_channel(self, channel: int):
+        self.zero_line.setPen(self.pens[channel])
+        self.zero_marker.setBrush(self.brushes[channel])
 
     def set_plot_color_scheme(self, plot_color_scheme: str):
         match plot_color_scheme:
@@ -310,9 +354,12 @@ class PlotsPanel(GraphicsLayoutWidget):
 
     def channel_color_changed(self, channel: int, color: str):
         self.pens[channel].setColor(color)
+        self.brushes[channel].setColor(color)
         self.traces[channel].setPen(self.pens[channel])
         self.app.worker.messages.put(WorkerMessage.SelectChannel(channel))
         self.y_axis.setTextPen(self.pens[channel])
+        self.zero_line.setPen(self.pens[channel])
+        self.zero_marker.setBrush(self.brushes[channel])
 
     def make_trigger_line_visible(self, visible: bool):
         if self.do_show_trig_level_line:
@@ -327,6 +374,10 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.app.app_persistence.config.set_by_xpath("/show_trigger_position_line", show_trig_pos_line)
         self.trigger_pos_line.setVisible(show_trig_pos_line)
         self.do_show_trig_pos_line = show_trig_pos_line
+
+    def set_show_zero_line(self, show_zero_line: bool):
+        self.app.app_persistence.config.set_by_xpath("/show_zero_line", show_zero_line)
+        self.zero_line.setVisible(show_zero_line)
 
     def set_trigger_lines_width(self, width: int):
         self.trigger_lines_pen.setWidth(width)
@@ -412,3 +463,5 @@ class PlotsPanel(GraphicsLayoutWidget):
                 self.plot.getViewBox().y() + self.y_axis.getViewBox().y() +
                 (1 - (self.corrected_trigger_level[0] + 1) / 2) * self.y_axis.height()
             )
+
+            self.zero_marker.setX(self.plot.getViewBox().x() + 8)

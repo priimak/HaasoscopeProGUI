@@ -27,12 +27,13 @@ class App:
     set_trigger_pos_from_plot_line: Callable[[float], None] = lambda _: None
     set_channel_active_state: Callable[[int, bool], None] = lambda a, b: None
     set_selected_channel: Callable[[int], None] = lambda _: None
+    select_channel_in_plot: Callable[[int], None] = lambda _: None
     deselect_channel: Callable[[int], None] = lambda _: None
     remove_all_y_axis_ticks_labels: Callable[[], None] = lambda: None
     set_channel_color: Callable[[int, str], None] = lambda a, b: None
     set_show_grid_state: Callable[[bool], None] = lambda _: None
     set_show_y_axis_labels: Callable[[bool], None] = lambda _: None
-    # set_show_zero_line_state: Callable[[bool], None] = lambda _: None
+    set_show_zero_line: Callable[[bool], None] = lambda _: None
     set_show_trigger_level_line: Callable[[bool], None] = lambda _: None
     set_show_trig_pos_line: Callable[[bool], None] = lambda _: None
     make_trig_level_line_visible_temp: Callable[[bool], None] = lambda _: None
@@ -133,6 +134,7 @@ class App:
 
     def do_select_channel(self, channel: int):
         self.set_selected_channel(channel)
+        self.select_channel_in_plot(channel)
         self.selected_channel = channel
 
     def do_deselect_channel(self, channel: int):
@@ -320,7 +322,11 @@ class GUIWorker(QRunnable, ):
         self.msg_out = MessagesFromGUIWorker()
 
     def drain_queue(self) -> bool:
-        return self.messages.is_shutdown
+        while not self.messages.empty():
+            if isinstance(self.messages.get(), WorkerMessage.Quit):
+                return True
+
+        return False
 
     def run(self):
         is_armed = False
@@ -439,7 +445,6 @@ class GUIWorker(QRunnable, ):
                                     last_auto_armed_at_s = time.time()
 
                                 self.messages.put(WorkerMessage.PlotAndRearmAuto())
-                        time.sleep(0.01)
 
                 case WorkerMessage.Disarm():
                     if self.drain_queue():

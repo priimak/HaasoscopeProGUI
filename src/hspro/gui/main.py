@@ -23,12 +23,13 @@ def main():
         app_name="hspro",
         override_config_if_different_version=True,
         init_config_data={
-            "config_version": 12,
+            "config_version": 14,
             "plot_color_scheme": "dark",
             "show_trigger_level_line": False,
             "show_trigger_position_line": False,
             "show_grid": True,
             "show_y_axis_labels": True,
+            "show_zero_line": True,
             "general": {
                 "highres": True,
                 "mem_depth": 100,

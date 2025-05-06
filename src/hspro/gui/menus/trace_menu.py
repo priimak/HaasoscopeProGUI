@@ -54,11 +54,11 @@ class TraceMenu(QMenu):
         self.show_trig_pos_line.triggered.connect(self.set_show_trig_pos_line)
         self.addAction(self.show_trig_pos_line)
 
-        # self.show_zero_line = QAction("Show &Central Line", self)
-        # self.show_zero_line.setCheckable(True)
-        # self.show_zero_line.setChecked(True)
-        # self.show_zero_line.triggered.connect(self.set_show_zero_line_state)
-        # self.addAction(self.show_zero_line)
+        self.show_zero_line = QAction("Show &Zero Line", self)
+        self.show_zero_line.setCheckable(True)
+        self.show_zero_line.setChecked(app.app_persistence.config.get_by_xpath("/show_zero_line"))
+        self.show_zero_line.triggered.connect(self.set_show_zero_line_state)
+        self.addAction(self.show_zero_line)
 
         plot_color_scheme_menu = self.addMenu("Color &Scheme")
 
@@ -94,11 +94,11 @@ class TraceMenu(QMenu):
     def set_show_y_axis_labels(self, show_y_axis_labels: bool):
         self.app.set_show_y_axis_labels(show_y_axis_labels)
 
-    # def set_show_zero_line_state(self, show_zero_line: bool):
-    #     self.app.set_show_zero_line_state(show_zero_line)
-
     def set_show_trigger_level_line(self, show_trig_level_line: bool):
         self.app.set_show_trigger_level_line(show_trig_level_line)
+
+    def set_show_zero_line_state(self, show_zero_line: bool):
+        self.app.set_show_zero_line(show_zero_line)
 
     def set_show_trig_pos_line(self, show_trig_pos_line: bool):
         self.app.set_show_trig_pos_line(show_trig_pos_line)
