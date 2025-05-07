@@ -449,6 +449,8 @@ class PlotsPanel(GraphicsLayoutWidget):
                 self.corrected_trigger_position[0] * self.x_axis.width(),
                 0
             )
+        if hasattr(self, "app"):
+            self.app.update_y_axis_ticks(None)
 
     def paintEvent(self, ev):
         super().paintEvent(ev)
