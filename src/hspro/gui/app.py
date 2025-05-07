@@ -1,11 +1,13 @@
 import time
 from enum import Enum, auto
 from functools import cache
+from pathlib import Path
 from queue import Queue
 from typing import Callable, Optional
 
 from PySide6.QtCore import QThreadPool, QRunnable, Signal, QObject
 from PySide6.QtGui import QPalette, QPen, Qt
+from PySide6.QtWidgets import QMessageBox, QFileDialog
 from hspro_api import TriggerType, WaveformAvailable, Waveform
 from pytide6 import MainWindow
 from sprats.config import AppPersistence
@@ -98,6 +100,27 @@ class App:
         pen.setStyle(Qt.PenStyle.CustomDashLine)
         pen.setDashPattern([4, 4])
         return pen
+
+    def take_screenshot(self):
+        while True:
+            last_used_dir = self.app_persistence.state.get_value("last_dir_screenshot", f"{Path.home().absolute()}")
+            file, _ = QFileDialog.getSaveFileName(
+                None, "Save screenshot", dir=last_used_dir, filter="*.png;;*.jpg *.jpeg;;*"
+            )
+            if file == "":
+                break
+            else:
+                file_path = Path(file)
+                self.app_persistence.state.set_value("last_dir_screenshot", f"{file_path.parent.absolute()}")
+                if self.main_window().grab().save(file, file_path.suffix.replace(".", "")):
+                    QMessageBox.information(None, "Info", f"Screenshot saved into file {file_path.absolute()}")
+                    break
+                else:
+                    QMessageBox.critical(
+                        None, "Error",
+                        f"Failed to save screenshot into file:\n\n{file_path}\n\nprobably due to invalid format "
+                        f"or insufficient permissions."
+                    )
 
     def do_disarm_trigger(self):
         self.trigger_disarmed()

@@ -9,6 +9,7 @@ class FileMenu(QMenu):
         super().__init__("&File", parent)
         self.app = app
 
+        self.addAction("&Take screenshot", app.take_screenshot)
         self.addAction("&Export waveforms").setEnabled(False)
         self.addAction("&Open saved waveforms").setEnabled(False)
         self.addSeparator()
