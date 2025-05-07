@@ -28,5 +28,14 @@ class MainMenuBar(QMenuBar):
                 background-color: #3daee9;
                 color: white;
             }
+            
+            QMenuBar {
+                background-color: #ebeff4;
+            }
+
+            QMenuBar::item:selected {
+                background-color: #3daee9;
+                color: white;
+            }
             """
         )

@@ -54,12 +54,14 @@ class HSProMainWindow(MainWindow):
         self.top_controls_panel.setAutoFillBackground(True)
         controls_panel = VBoxPanel([self.top_controls_panel], margins=0)
 
-        main_panel = HBoxPanel(widgets=[
-            W(self.glw, stretch=1), controls_panel
-        ])
         self.setCentralWidget(
             VBoxPanel(
-                widgets=[W(main_panel, stretch=1), InfoPanel(self.app)],
+                widgets=[
+                    W(
+                        HBoxPanel(widgets=[W(self.glw, stretch=1), controls_panel]), stretch=1
+                    ),
+                    InfoPanel(self.app)
+                ],
                 spacing=0, margins=(0, 0, 0, 0)
             )
         )
