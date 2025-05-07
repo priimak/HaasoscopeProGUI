@@ -51,7 +51,7 @@ class App:
     correct_offset: Callable[[int], None] = lambda _: None
     correct_dV: Callable[[int], None] = lambda _: None
     plot_waveforms: Callable[[tuple[Optional[Waveform], Optional[Waveform]]], None] = lambda _: None
-    update_y_axis_ticks: Callable[[int], None] = lambda _: None
+    update_y_axis_ticks: Callable[[int | None], None] = lambda _: None
 
     set_trigger_lines_width: Callable[[int], None] = lambda _: None
     update_trigger_lines_color: Callable[[int], None] = lambda _: None
