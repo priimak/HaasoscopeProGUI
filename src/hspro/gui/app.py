@@ -52,6 +52,7 @@ class App:
     correct_dV: Callable[[int], None] = lambda _: None
     plot_waveforms: Callable[[tuple[Optional[Waveform], Optional[Waveform]]], None] = lambda _: None
     update_y_axis_ticks: Callable[[int | None], None] = lambda _: None
+    set_grid_opacity: Callable[[float], None] = lambda _: None
 
     set_trigger_lines_width: Callable[[int], None] = lambda _: None
     update_trigger_lines_color: Callable[[int], None] = lambda _: None
@@ -142,6 +143,9 @@ class App:
 
     def do_update_y_axis_ticks(self, channel: int) -> None:
         self.update_y_axis_ticks(channel)
+
+    def do_set_grid_opacity(self, opacity: float):
+        self.set_grid_opacity(opacity)
 
     def do_correct_trigger_position(self, position: float):
         self.correct_trigger_position(position)

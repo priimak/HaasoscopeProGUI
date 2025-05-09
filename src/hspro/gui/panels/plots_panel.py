@@ -36,6 +36,8 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.first_time_pained = True
         self.show_y_axis_labels_p = [app.app_persistence.config.get_by_xpath("/show_y_axis_labels")]
         self.selected_channel = [0]
+        self.grid_opacity = float(self.app.app_persistence.state.get_value("grid_opacity", "0.5"))
+        self.grid_visible = self.app.app_persistence.config.get_by_xpath("/show_grid")
 
         self.trigger_lines_color_map = "Matching Trigger Channel"
 
@@ -45,14 +47,22 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.plot.autoBtn.show = lambda: None
         self.plot.setMenuEnabled(False)
 
-        show_grid_p = self.app.app_persistence.config.get_by_xpath("/show_grid")
-        self.plot.showGrid(show_grid_p, show_grid_p, 0.4)
+        self.plot.showGrid(self.grid_visible, self.grid_visible, self.grid_opacity)
 
         def show_grid(show: bool):
-            self.plot.showGrid(show, show, 0.4)
+            self.plot.showGrid(show, show, self.grid_opacity)
             self.app.app_persistence.config.set_by_xpath("/show_grid", show)
+            self.grid_visible = show
 
         self.app.set_show_grid_state = show_grid
+
+        def update_grid_opacity(opacity: float):
+            self.grid_opacity = opacity / 255
+            self.app.app_persistence.state.set_value("grid_opacity", f"{self.grid_opacity}")
+            if self.grid_visible:
+                self.plot.showGrid(True, True, self.grid_opacity)
+
+        self.app.set_grid_opacity = update_grid_opacity
 
         self.x_axis: AxisItem = self.plot.axes["bottom"]["item"]
         self.x_axis.setZValue(1)  # grid will appear above traces

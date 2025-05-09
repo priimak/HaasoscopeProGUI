@@ -1,5 +1,6 @@
-from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QMenu, QMenuBar
+from PySide6.QtGui import QAction, Qt
+from PySide6.QtWidgets import QMenu, QMenuBar, QWidgetAction, QSlider, QLabel
+from pytide6 import HBoxPanel
 
 from hspro.gui.app import App
 from hspro.gui.read_out_options_dialog import ReadOutOptionsDialog
@@ -41,6 +42,18 @@ class TraceMenu(QMenu):
         self.show_grid.setChecked(app.app_persistence.config.get_by_xpath("/show_grid"))
         self.show_grid.triggered.connect(self.set_show_grid_state)
         self.addAction(self.show_grid)
+
+        ################### Grid Opacity
+        grid_opacity = app.app_persistence.state.get_value("grid_opacity", "0.5")
+        grid_opacity_slider_action = QWidgetAction(self)
+        grid_opacity_slider = QSlider(Qt.Orientation.Horizontal, self)
+        grid_opacity_slider.setMinimum(0)
+        grid_opacity_slider.setMaximum(255)
+        grid_opacity_slider.setValue(int(float(grid_opacity) * 255))
+        grid_opacity_slider.valueChanged.connect(self.app.do_set_grid_opacity)
+        m = HBoxPanel([HBoxPanel([QLabel("Grid Opacity")], margins=(10, 0, 0, 0)), grid_opacity_slider])
+        grid_opacity_slider_action.setDefaultWidget(m)
+        self.addAction(grid_opacity_slider_action)
 
         self.show_trig_level_line = QAction("Show &Trigger Level Line", self)
         self.show_trig_level_line.setCheckable(True)
