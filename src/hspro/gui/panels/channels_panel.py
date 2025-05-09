@@ -1,7 +1,7 @@
 from typing import Callable
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPalette, QMouseEvent
+from PySide6.QtGui import QPalette, QMouseEvent, QColor
 from PySide6.QtWidgets import QSpacerItem, QDoubleSpinBox, QColorDialog
 from pytide6 import VBoxPanel, CheckBox, ComboBox, Label, HBoxPanel, W
 from unlib import MetricValue, Scale
@@ -140,9 +140,10 @@ class ChannelsPanel(VBoxPanel):
                 def select_color(ev: QMouseEvent):
                     if self.app.model.channel[channel].active:
                         cdialog = QColorDialog(self)
+                        cdialog.setOption(QColorDialog.ColorDialogOption.ShowAlphaChannel)
                         cdialog.setCurrentColor(app.model.channel[channel].color)
                         if cdialog.exec_():
-                            new_color = cdialog.currentColor().name()
+                            new_color = cdialog.currentColor().name(QColor.NameFormat.HexArgb)
                             color_selector.setStyleSheet(
                                 f"background-color: {new_color}; border: 1px solid black;"
                             )
