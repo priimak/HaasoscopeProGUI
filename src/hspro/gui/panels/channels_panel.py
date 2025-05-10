@@ -110,6 +110,7 @@ class ChannelsPanel(VBoxPanel):
         self.setAutoFillBackground(True)
         self.channel_selectors = []
         self.spws = []
+        self.trigger_on_labels = []
         vdiv_spinners = []
         offset_spinners = []
 
@@ -210,8 +211,10 @@ class ChannelsPanel(VBoxPanel):
                 ], margins=(0, 5, 0, 0)),
             ])
 
+            trigger_on_label = Label("")
+            self.trigger_on_labels.append(trigger_on_label)
             channel_panel = VBoxPanel(widgets=[
-                HBoxPanel([Label(channel_name), channel_color_selector], margins=0),
+                HBoxPanel([W(Label(channel_name), stretch=1), trigger_on_label, channel_color_selector], margins=0),
                 CheckBox(
                     "Active",
                     on_change=self.channel_active_callback(channel, channel_config_panel),
@@ -219,6 +222,8 @@ class ChannelsPanel(VBoxPanel):
                 ),
                 channel_config_panel]
             )
+            self.app.update_trigger_on_channel_label = self.update_trigger_on_channel_label
+
             if not app.model.channel[channel].active:
                 channel_config_panel.setVisible(False)
             channel_panel.setMinimumWidth(ChannelsPanel.min_width)
@@ -292,3 +297,12 @@ class ChannelsPanel(VBoxPanel):
     def deselect_channel(self, channel: int):
         self.spws[channel].setPalette(self.app.side_pannels_palette())
         self.app.selected_channel = None
+
+    def update_trigger_on_channel_label(self, channel: int):
+        for c in self.app.channels:
+            if c == channel:
+                self.trigger_on_labels[c].setText("Trig")
+                self.trigger_on_labels[c].setStyleSheet("background-color: white; border: 1px solid black;")
+            else:
+                self.trigger_on_labels[c].setText("")
+                self.trigger_on_labels[c].setStyleSheet(f"background-color: #90e0ef; border: none;")

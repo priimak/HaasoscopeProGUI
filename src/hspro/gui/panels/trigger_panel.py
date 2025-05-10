@@ -194,6 +194,7 @@ class TriggerPanel(VBoxPanel):
         on_channel = int(channel.replace("Channel", "").strip())
         self.app.worker.messages.put(WorkerMessage.SetTriggerOnChannel(on_channel))
         self.app.update_trigger_lines_color(on_channel)
+        self.app.do_update_trigger_on_channel_label(on_channel)
 
     def trigger_type_callback(self, trigger_type: str):
         self.app.model.trigger.trigger_type = TriggerTypeModel.value_of(trigger_type)
@@ -204,10 +205,12 @@ class TriggerPanel(VBoxPanel):
             self.trigger_level.setEnabled(False)
             self.channel_selector.setEnabled(False)
             self.set_trigger_level_line_visible(False)
+            self.app.do_update_trigger_on_channel_label(-1)
         else:
             self.trigger_level.setEnabled(True)
             self.channel_selector.setEnabled(True)
             self.set_trigger_level_line_visible(True)
+            self.app.do_update_trigger_on_channel_label(self.app.model.trigger.on_channel)
 
     def trigger_position_callback(self):
         self.app.worker.messages.put(

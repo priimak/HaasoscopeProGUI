@@ -8,7 +8,7 @@ from sprats.config import AppPersistence
 
 from hspro.gui.app import App, WorkerMessage
 from hspro.gui.menus.menu_bar import MainMenuBar
-from hspro.gui.model import BoardModel
+from hspro.gui.model import BoardModel, TriggerTypeModel
 from hspro.gui.panels.channels_panel import ChannelsPanel
 from hspro.gui.panels.general_opts_panel import GeneralOptionsPanel
 from hspro.gui.panels.info_panel import InfoPanel
@@ -83,6 +83,11 @@ class HSProMainWindow(MainWindow):
                 break
 
         self.app.worker.messages.put(WorkerMessage.SetTriggerPosition(self.app.model.trigger.position_live))
+
+        if self.app.model.trigger.trigger_type == TriggerTypeModel.EXTERNAL_SIGNAL:
+            self.app.update_trigger_on_channel_label(-1)
+        else:
+            self.app.update_trigger_on_channel_label(self.app.model.trigger.on_channel)
 
     def color_scheme(self, color_scheme: str):
         self.glw.set_plot_color_scheme(color_scheme)
