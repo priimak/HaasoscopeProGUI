@@ -106,6 +106,9 @@ class TriggerPanel(VBoxPanel):
             min_width=100,
             on_text_change=self.trigger_channel_callback
         )
+        self.app.set_trigger_on_channel = self.set_trigger_on_channel
+        if app.model.trigger.trigger_type == TriggerTypeModel.EXTERNAL_SIGNAL:
+            self.channel_selector.setEnabled(False)
 
         main_panel.addWidget(HBoxPanel(
             widgets=[
@@ -251,3 +254,7 @@ class TriggerPanel(VBoxPanel):
         with self.selected_button_lock:
             if self.selected_button != self.force_acq_button.text():
                 self.app.worker.messages.put(WorkerMessage.ArmForceAcq())
+
+    def set_trigger_on_channel(self, channel: int):
+        if self.channel_selector.isEnabled():
+            self.channel_selector.setCurrentText(f"Channel {channel}")

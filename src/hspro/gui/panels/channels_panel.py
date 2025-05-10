@@ -116,6 +116,11 @@ class ChannelsPanel(VBoxPanel):
         def mk_select_op(ch: int):
             def select_op(event):
                 if self.app.model.channel[ch].active:
+                    if (event is not None and event.modifiers() == Qt.KeyboardModifier.ControlModifier):
+                        # we use this to select this channel for trigger
+                        self.app.set_trigger_on_channel(ch)
+                        return
+
                     p = QPalette()
                     p.setColor(QPalette.ColorRole.Window, "red")
                     self.spws[ch].setPalette(p)
