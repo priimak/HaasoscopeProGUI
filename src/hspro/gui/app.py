@@ -54,7 +54,6 @@ class App:
     update_y_axis_ticks: Callable[[int | None], None] = lambda _: None
     set_grid_opacity: Callable[[float], None] = lambda _: None
     set_trigger_on_channel: Callable[[int], None] = lambda _: None
-    update_trigger_on_channel_label: Callable[[int], None] = lambda _: None
 
     set_trigger_lines_width: Callable[[int], None] = lambda _: None
     update_trigger_lines_color: Callable[[int], None] = lambda _: None
@@ -69,6 +68,8 @@ class App:
     selected_channel: int | None = None
 
     def __init__(self):
+        self.update_trigger_on_channel_label: Callable[[int], None] = lambda _: None
+
         self.board_thread_pool = QThreadPool()
         self.worker = GUIWorker(self)
         self.worker.msg_out.disarm_trigger.connect(self.do_disarm_trigger)

@@ -1,7 +1,8 @@
 from threading import Lock
 
-from PySide6.QtGui import Qt
-from PySide6.QtWidgets import QSpacerItem, QSlider, QLabel
+from PySide6.QtCore import QRect
+from PySide6.QtGui import Qt, QPixmap, QPainter
+from PySide6.QtWidgets import QSpacerItem, QSlider, QLabel, QComboBox
 from pytide6 import VBoxPanel, VBoxLayout, PushButton, Label, HBoxPanel, ComboBox, W
 
 from hspro.gui.app import App, WorkerMessage
@@ -100,12 +101,21 @@ class TriggerPanel(VBoxPanel):
         layout.addWidget(HBoxPanel([main_panel, trig_level_panel], margins=0))
 
         main_panel.addWidget(VBoxPanel([QLabel("Trigger on")], margins=(0, 70, 0, 0)))
-        self.channel_selector = ComboBox(
-            items=["Channel 0", "Channel 1"],
-            current_selection=f"Channel {app.model.trigger.on_channel}",
-            min_width=100,
-            on_text_change=self.trigger_channel_callback
-        )
+        self.channel_selector = QComboBox()
+        self.channel_selector.setMaximumWidth(150)
+        self.channel_selector.currentTextChanged.connect(self.trigger_channel_callback)
+        self.channel_selector.setCurrentIndex(app.model.trigger.on_channel)
+
+        self.channels_pixmaps = []
+        for c in self.app.channels:
+            cp = QPixmap(22, 17)
+            cp.fill("black")
+            qp = QPainter(cp)
+            qp.fillRect(QRect(1, 1, 20, 15), self.app.model.channel[c].color)
+            qp.end()
+            self.channels_pixmaps.append(cp)
+            self.channel_selector.addItem(cp, f"Channel {c}")
+
         self.app.set_trigger_on_channel = self.set_trigger_on_channel
         if app.model.trigger.trigger_type == TriggerTypeModel.EXTERNAL_SIGNAL:
             self.channel_selector.setEnabled(False)
@@ -152,6 +162,21 @@ class TriggerPanel(VBoxPanel):
         self.app.trigger_armed_normal = self.trigger_armed_normal
         self.app.trigger_armed_auto = self.trigger_armed_auto
         self.app.trigger_force_acq = self.trigger_force_acq
+
+        def mk_set_ch_color():
+            f = self.app.set_channel_color
+
+            def set_ch_color(channel: int, color: str):
+                f(channel, color)
+                px = self.channels_pixmaps[channel]
+                qp = QPainter(px)
+                qp.fillRect(QRect(1, 1, 20, 15), color)
+                qp.end()
+                self.channel_selector.setItemIcon(channel, px)
+
+            return set_ch_color
+
+        self.app.set_channel_color = mk_set_ch_color()
 
     def trigger_armed_single(self):
         with self.selected_button_lock:
