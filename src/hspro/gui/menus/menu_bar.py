@@ -3,6 +3,7 @@ from PySide6.QtWidgets import QMenuBar
 from hspro.gui.app import App
 from hspro.gui.menus.file_menu import FileMenu
 from hspro.gui.menus.help_menu import HelpMenu
+from hspro.gui.menus.scene_menu import SceneMenu
 from hspro.gui.menus.trace_menu import TraceMenu
 
 
@@ -12,10 +13,12 @@ class MainMenuBar(QMenuBar):
 
         self.file_menu = FileMenu(self, app)
         self.trace_menu = TraceMenu(self, app)
+        self.scene_menu = SceneMenu(self, app)
         self.help_menu = HelpMenu(self)
 
         self.addMenu(self.file_menu)
         self.addMenu(self.trace_menu)
+        self.addMenu(self.scene_menu)
         self.addMenu(self.help_menu)
 
         self.setStyleSheet(

@@ -4,6 +4,7 @@ from typing import Optional
 
 from PySide6.QtCore import QPointF, Signal
 from PySide6.QtGui import QPen, Qt, QFontDatabase, QColor, QBrush
+# from PySide6.QtWidgets import QGraphicsSceneMouseEvent
 from hspro_api import Waveform
 from pyqtgraph import AxisItem, GraphicsLayoutWidget, InfiniteLine, PlotDataItem, TextItem
 from pyqtgraph.graphicsItems.PlotItem import PlotItem
@@ -144,6 +145,23 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.vbox: ViewBox = self.x_axis.linkedView()
         self.vbox.setMouseEnabled(False, False)
         self.vbox.setRange(xRange=(0, 10), yRange=(-5, 5), padding=0)
+
+        #        self.vbox.mousePressEvent = self.mouseAction
+
+        # self.originalMousePressEvent = self.vbox.mousePressEvent
+        # self.zoomStartingPoint = []
+        # def zoom_start(e: QGraphicsSceneMouseEvent):
+        #     self.zoomStartingPoint.clear()
+        #     self.zoomStartingPoint.append(e.pos())
+        #     # print(self.zoomStartingPoint[0])
+        # self.vbox.setMouseMode(ViewBox.RectMode)
+        # # self.vbox.mousePressEvent = zoom_start
+        #
+        # def md(ev, ax=None):
+        #     print(ev)
+        #
+        #     pyqtgraph.ViewBox.mouseDragEvent(self.vbox, ev, axis=ax)
+        # self.vbox.mouseDragEvent = md
 
         # self.zero_h_line = InfiniteLine(pos=0, movable=False, angle=0, pen=(0, 0, 200), span=(0, 1))
         # self.plot.addItem(self.zero_h_line)
@@ -477,3 +495,6 @@ class PlotsPanel(GraphicsLayoutWidget):
             )
 
             self.zero_marker.setX(self.plot.getViewBox().x() + 8)
+
+    # def mouseAction(self, ev: QGraphicsSceneMouseEvent):
+    #     print(self.app.current_active_tool)

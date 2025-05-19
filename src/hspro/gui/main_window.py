@@ -14,6 +14,7 @@ from hspro.gui.panels.general_opts_panel import GeneralOptionsPanel
 from hspro.gui.panels.info_panel import InfoPanel
 from hspro.gui.panels.plots_panel import PlotsPanel
 from hspro.gui.panels.trigger_panel import TriggerPanel
+from hspro.gui.toolbar import MainToolBar
 
 
 class HSProMainWindow(MainWindow):
@@ -32,6 +33,7 @@ class HSProMainWindow(MainWindow):
         set_geometry(app_state=app_persistence.state, widget=self, screen_dim=screen_dim, win_size_fraction=0.7)
 
         self.menu_bar = self.setMenuBar(MainMenuBar(self.app))
+        self.addToolBar(MainToolBar(self.app))
 
         self.glw = PlotsPanel(self, self.app)
         self.app.set_plot_color_scheme = self.color_scheme

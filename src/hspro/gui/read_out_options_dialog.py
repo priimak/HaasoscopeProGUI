@@ -46,13 +46,13 @@ class ReadOutOptionsDialog(Dialog):
 
         def on_ok():
             if app.model.highres != highres_cb.isChecked():
-                app.model.highres = highres_cb.isChecked()
+                app.worker.messages.put(WorkerMessage.SetHighres(highres_cb.isChecked()))
 
             if app.model.delay != delay_sb.value():
-                app.model.delay = delay_sb.value()
+                app.worker.messages.put(WorkerMessage.SetDelay(delay_sb.value()))
 
             if app.model.f_delay != f_delay_sb.value():
-                app.model.f_delay = f_delay_sb.value()
+                app.worker.messages.put(WorkerMessage.SetFDelay(f_delay_sb.value()))
 
             if app.model.mem_depth != mem_depth_sb.value():
                 app.worker.messages.put(WorkerMessage.SetMemoryDepth(mem_depth_sb.value()))

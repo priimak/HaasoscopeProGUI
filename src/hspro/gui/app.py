@@ -1,3 +1,5 @@
+import dataclasses
+import json
 import time
 from enum import Enum, auto
 from functools import cache
@@ -14,6 +16,7 @@ from sprats.config import AppPersistence
 from unlib import Duration
 
 from hspro.gui.model import BoardModel, ChannelCouplingModel, ChannelImpedanceModel
+from hspro.gui.scene import Scene, SceneCheckpoint, ChannelData
 
 
 class App:
@@ -23,6 +26,7 @@ class App:
     exit_application: Callable[[], bool] = lambda: True
     set_connection_status_label: Callable[[str], None] = lambda _: None
     set_live_info_label: Callable[[str], None] = lambda _: None
+    update_scene_data: Callable[[Scene], None] = lambda _: None
     set_plot_color_scheme: Callable[[str], None] = lambda _: None
     channels: list[int] = [0, 1]
     set_trigger_level_from_plot_line: Callable[[float], None] = lambda _: None
@@ -59,6 +63,10 @@ class App:
     update_trigger_lines_color: Callable[[int], None] = lambda _: None
     set_trigger_lines_color_map: Callable[[str], None] = lambda _: None
 
+    apply_checkpoint_to_trace_menu: Callable[[SceneCheckpoint], None] = lambda _: None
+    apply_checkpoint_to_trigger_panel: Callable[[SceneCheckpoint], None] = lambda _: None
+    apply_checkpoint_to_channels_panel: Callable[[SceneCheckpoint], None] = lambda _: None
+
     board_thread_pool: QThreadPool
     worker: "GUIWorker"
 
@@ -66,9 +74,13 @@ class App:
     trigger_lines_color_map: str = "Matching Trigger Channel"
     plot_color_scheme: str = "light"
     selected_channel: int | None = None
+    current_active_tool = ""
 
     def __init__(self):
         self.update_trigger_on_channel_label: Callable[[int], None] = lambda _: None
+
+        self.scene = Scene("default", version=1, data=[])  # default scene
+        self.scene_file: Path | None = None
 
         self.board_thread_pool = QThreadPool()
         self.worker = GUIWorker(self)
@@ -84,6 +96,101 @@ class App:
         self.worker.msg_out.correct_offset.connect(self.do_correct_offset)
         self.worker.msg_out.correct_dV.connect(self.do_correct_dV)
         self.board_thread_pool.start(self.worker)
+
+    def create_new_scene(self):
+        while True:
+            last_used_dir = self.app_persistence.state.get_value("last_dir_scene", f"{Path.home().absolute()}")
+            file, _ = QFileDialog.getSaveFileName(None, "Create scene", dir=last_used_dir, filter="*.hss")
+            if file == "":
+                break
+            else:
+                self.scene_file = Path(file).with_suffix(".hss")
+                self.scene = Scene(f"{self.scene_file.name}", version=1, data=[])
+                self.app_persistence.state.set_value("last_dir_scene", f"{self.scene_file.parent.absolute()}")
+                self.scene_file.write_text(json.dumps(dataclasses.asdict(self.scene), indent=2))
+                self.do_update_scene_data(self.scene)
+                break
+
+    def get_scene(self) -> Scene:
+        return self.scene
+
+    def record_state_in_scene(self):
+        waveforms = self.model.get_waveforms()
+        cds: list[ChannelData] = []
+        for ch in self.channels:
+            wf: Waveform = waveforms[ch]
+            if wf is None:
+                cds.append(ChannelData(
+                    active=self.model.channel[ch].active,
+                    color=self.model.channel[ch].color,
+                    offset_V=self.model.channel[ch].offset_V,
+                    dV=self.model.channel[ch].dV,
+                    coupling=self.model.channel[ch].coupling.value,
+                    impedance=self.model.channel[ch].impedance.value,
+                    ten_x_probe=self.model.channel[ch].ten_x_probe,
+                    t_s_0=0,
+                    dt_s=0,
+                    v=[]
+                ))
+            else:
+                cds.append(ChannelData(
+                    active=self.model.channel[ch].active,
+                    color=self.model.channel[ch].color,
+                    offset_V=self.model.channel[ch].offset_V,
+                    dV=self.model.channel[ch].dV,
+                    coupling=self.model.channel[ch].coupling.value,
+                    impedance=self.model.channel[ch].impedance.value,
+                    ten_x_probe=self.model.channel[ch].ten_x_probe,
+                    t_s_0=(- wf.dt_s * wf.trigger_pos),
+                    dt_s=wf.dt_s,
+                    v=wf.vs
+                ))
+
+        state = SceneCheckpoint(
+            plot_color_scheme=self.app_persistence.config.get_by_xpath("/plot_color_scheme", str),
+            show_trigger_level_line=self.app_persistence.config.get_by_xpath("/show_trigger_level_line", bool),
+            show_trigger_position_line=self.app_persistence.config.get_by_xpath("/show_trigger_position_line", bool),
+            show_grid=self.app_persistence.config.get_by_xpath("/show_grid", bool),
+            show_y_axis_labels=self.app_persistence.config.get_by_xpath("/show_y_axis_labels", bool),
+            show_zero_line=self.app_persistence.config.get_by_xpath("/show_zero_line", bool),
+            highres=self.app_persistence.config.get_by_xpath("/general/highres", bool),
+            mem_depth=self.app_persistence.config.get_by_xpath("/general/mem_depth", int),
+            delay=self.app_persistence.config.get_by_xpath("/general/delay", int),
+            f_delay=self.app_persistence.config.get_by_xpath("/general/f_delay", int),
+            visual_time_scale=self.app_persistence.config.get_by_xpath("/general/visual_time_scale", str),
+            trigger_on_channel=self.app_persistence.config.get_by_xpath("/trigger/on_channel", int),
+            trigger_type=self.app_persistence.config.get_by_xpath("/trigger/trigger_type", str),
+            trigger_tot=self.app_persistence.config.get_by_xpath("/trigger/tot", int),
+            trigger_delta=self.app_persistence.config.get_by_xpath("/trigger/delta", int),
+            trigger_level=self.app_persistence.config.get_by_xpath("/trigger/level", float),
+            trigger_position=self.app_persistence.config.get_by_xpath("/trigger/position", float),
+            trigger_auto_frequency=self.app_persistence.config.get_by_xpath("/trigger/auto_frequency", str),
+            selected_channel=(-1 if self.selected_channel is None else self.selected_channel),
+            channels=cds
+        )
+
+        if self.scene_file is None:
+            self.create_new_scene()
+
+        if self.scene_file is None:
+            return
+
+        self.scene.data.append(state)
+        self.do_update_scene_data(self.scene)
+
+        if self.scene_file is not None:
+            self.save_scene()
+
+    def activate_scene_checkpoint(self, checkpoint_num: int):
+        self.worker.messages.put(WorkerMessage.Disarm(disable_queue_draining=True))
+        while self.worker.arm_type != ArmType.DISARMED:
+            pass
+
+        checkpoint = self.scene.data[checkpoint_num - 1]
+        self.apply_checkpoint_to_trace_menu(checkpoint)
+        self.apply_checkpoint_to_trigger_panel(checkpoint)
+        self.apply_checkpoint_to_channels_panel(checkpoint)
+        self.worker.messages.put(WorkerMessage.Disarm(disable_queue_draining=False))
 
     def init(self):
         plot_color_scheme: str | None = self.app_persistence.config.get_value("plot_color_scheme", str)
@@ -125,6 +232,26 @@ class App:
                         f"Failed to save screenshot into file:\n\n{file_path}\n\nprobably due to invalid format "
                         f"or insufficient permissions."
                     )
+
+    def open_scene(self):
+        while True:
+            last_used_dir = self.app_persistence.state.get_value("last_dir_scene", f"{Path.home().absolute()}")
+            file, _ = QFileDialog.getOpenFileName(None, "Open scene", dir=last_used_dir, filter="*.hss")
+            if file == "":
+                break
+            else:
+                self.scene_file = Path(file).with_suffix(".hss")
+                self.app_persistence.state.set_value("last_dir_scene", f"{self.scene_file.parent.absolute()}")
+                json_data = json.loads(self.scene_file.read_text())
+                self.scene = Scene.value_of(json_data)
+                self.do_update_scene_data(self.scene)
+                break
+
+    def save_scene(self):
+        self.scene_file.write_text(json.dumps(dataclasses.asdict(self.scene), indent=2))
+
+    def do_update_scene_data(self, scene: Scene):
+        self.update_scene_data(scene)
 
     def do_disarm_trigger(self):
         self.trigger_disarmed()
@@ -224,7 +351,10 @@ class WorkerMessage:
             self.notify_gui = notify_gui
 
     class Disarm:
-        pass
+        __match_args__ = ("disable_queue_draining",)
+
+        def __init__(self, disable_queue_draining: bool = False):
+            self.disable_queue_draining = disable_queue_draining
 
     class PlotAndDisarm:
         pass
@@ -278,11 +408,12 @@ class WorkerMessage:
             self.dt_per_division = dt_per_division
 
     class SetVoltagePerDiv:
-        __match_args__ = ("channel", "dV",)
+        __match_args__ = ("channel", "dV", "update_visual_controls")
 
-        def __init__(self, channel: int, dV: float):
+        def __init__(self, channel: int, dV: float, update_visual_controls: bool):
             self.channel = channel
             self.dV = dV
+            self.update_visual_controls = update_visual_controls
 
     class SetChannel10x:
         __match_args__ = ("channel", "ten_x",)
@@ -325,6 +456,24 @@ class WorkerMessage:
         def __init__(self, mem_depth: int):
             self.mem_depth = mem_depth
 
+    class SetHighres:
+        __match_args__ = ("highres",)
+
+        def __init__(self, highres: bool):
+            self.highres = highres
+
+    class SetDelay:
+        __match_args__ = ("delay",)
+
+        def __init__(self, delay: int):
+            self.delay = delay
+
+    class SetFDelay:
+        __match_args__ = ("f_delay",)
+
+        def __init__(self, f_delay: int):
+            self.f_delay = f_delay
+
     class Quit:
         pass
 
@@ -356,17 +505,22 @@ class GUIWorker(QRunnable, ):
         self.messages = Queue()
         self.app = app
         self.msg_out = MessagesFromGUIWorker()
+        self.disable_queue_draining = False
+        self.arm_type = ArmType.DISARMED
 
     def drain_queue(self) -> bool:
-        while not self.messages.empty():
-            if isinstance(self.messages.get(), WorkerMessage.Quit):
-                return True
+        if self.disable_queue_draining:
+            return False
+        else:
+            while not self.messages.empty():
+                if isinstance(self.messages.get(), WorkerMessage.Quit):
+                    return True
 
-        return False
+            return False
 
     def run(self):
         is_armed = False
-        arm_type = ArmType.DISARMED
+        self.arm_type = ArmType.DISARMED
         current_trigger_type = TriggerType.DISABLED
         last_auto_armed_at_s = 0.0
 
@@ -377,7 +531,7 @@ class GUIWorker(QRunnable, ):
         def rearm_if_required():
             if is_armed:
                 # rearm
-                match arm_type:
+                match self.arm_type:
                     case ArmType.SINGLE:
                         self.messages.put(WorkerMessage.ArmSingle(current_trigger_type))
                     case ArmType.NORMAL:
@@ -392,7 +546,7 @@ class GUIWorker(QRunnable, ):
                 case WorkerMessage.ArmSingle(trigger_type):
                     if self.drain_queue():
                         break
-                    arm_type = ArmType.SINGLE
+                    self.arm_type = ArmType.SINGLE
                     current_trigger_type = trigger_type
                     self.app.model.trigger.force_arm_trigger(trigger_type)
                     self.messages.put(WorkerMessage.PlotAndDisarm())
@@ -405,7 +559,7 @@ class GUIWorker(QRunnable, ):
                             break
                         else:
                             self.msg_out.trigger_armed_normal.emit()
-                    arm_type = ArmType.NORMAL
+                    self.arm_type = ArmType.NORMAL
                     current_trigger_type = trigger_type
                     self.app.model.trigger.force_arm_trigger(trigger_type)
                     self.messages.put(WorkerMessage.PlotAndRearmNormal())
@@ -418,7 +572,7 @@ class GUIWorker(QRunnable, ):
                         else:
                             self.msg_out.trigger_armed_auto.emit()
 
-                    arm_type = ArmType.AUTO
+                    self.arm_type = ArmType.AUTO
                     current_trigger_type = trigger_type
                     self.app.model.trigger.force_arm_trigger(trigger_type)
                     last_auto_armed_at_s = time.time()
@@ -431,7 +585,7 @@ class GUIWorker(QRunnable, ):
                     self.msg_out.trigger_armed_forced_acq.emit()
                     self.app.model.trigger.force_arm_trigger(TriggerType.AUTO)
                     is_armed = True
-                    match arm_type:
+                    match self.arm_type:
                         case ArmType.DISARMED:
                             self.messages.put(WorkerMessage.PlotAndDisarm())
                         case ArmType.SINGLE:
@@ -482,14 +636,15 @@ class GUIWorker(QRunnable, ):
 
                                 self.messages.put(WorkerMessage.PlotAndRearmAuto())
 
-                case WorkerMessage.Disarm():
+                case WorkerMessage.Disarm(disable_queue_draining):
                     if self.drain_queue():
                         break
+                    self.disable_queue_draining = disable_queue_draining
                     is_armed = False
-                    arm_type = ArmType.DISARMED
                     current_trigger_type = TriggerType.DISABLED
                     self.app.model.trigger.force_arm_trigger(TriggerType.DISABLED)
                     self.msg_out.disarm_trigger.emit()
+                    self.arm_type = ArmType.DISARMED
 
                 case WorkerMessage.PlotAndDisarm():
                     if is_armed:
@@ -500,7 +655,7 @@ class GUIWorker(QRunnable, ):
                                 self.msg_out.plot_waveforms.emit((w1, w2))
                                 self.app.model.trigger.force_arm_trigger(TriggerType.DISABLED)
                                 self.msg_out.disarm_trigger.emit()
-                                arm_type = ArmType.DISARMED
+                                self.arm_type = ArmType.DISARMED
                                 is_armed = False
 
                             case _:
@@ -569,7 +724,7 @@ class GUIWorker(QRunnable, ):
                     self.msg_out.correct_trigger_position.emit(self.app.model.trigger.position_live)
                     rearm_if_required()
 
-                case WorkerMessage.SetVoltagePerDiv(channel, dV):
+                case WorkerMessage.SetVoltagePerDiv(channel, dV, update_visual_controls):
                     if self.drain_queue():
                         break
                     disarm_if_armed()
@@ -583,6 +738,11 @@ class GUIWorker(QRunnable, ):
                         self.app.model.channel[channel].offset_V = current_offset_V * offset_scaling_factor
                         self.msg_out.correct_offset.emit(channel)
                     self.msg_out.update_y_ticks.emit(channel)
+                    if channel == 0:
+                        print(f"SetVoltagePerDiv({self.app.model.channel[channel].dV}) for {channel}")
+
+                    if update_visual_controls:
+                        self.msg_out.correct_dV.emit(channel)
 
                     rearm_if_required()
 
@@ -650,7 +810,9 @@ class GUIWorker(QRunnable, ):
                         break
                     disarm_if_armed()
                     self.app.model.channel[channel].offset_V = offset_V
+                    self.msg_out.correct_offset.emit(channel)
                     self.msg_out.update_y_ticks.emit(channel)
+                    print(f"self.app.model.channel[{channel}].offset_V = {self.app.model.channel[channel].offset_V}")
                     rearm_if_required()
 
                 case WorkerMessage.SetMemoryDepth(mem_depth):
@@ -660,6 +822,27 @@ class GUIWorker(QRunnable, ):
                     self.app.model.mem_depth = mem_depth
                     self.app.model.trigger.update_live_trigger_properties()
                     self.msg_out.correct_trigger_position.emit(self.app.model.trigger.position_live)
+                    rearm_if_required()
+
+                case WorkerMessage.SetHighres(highres):
+                    if self.drain_queue():
+                        break
+                    disarm_if_armed()
+                    self.app.model.highres = highres
+                    rearm_if_required()
+
+                case WorkerMessage.SetDelay(delay):
+                    if self.drain_queue():
+                        break
+                    disarm_if_armed()
+                    self.app.model.delay = delay
+                    rearm_if_required()
+
+                case WorkerMessage.SetFDelay(f_delay):
+                    if self.drain_queue():
+                        break
+                    disarm_if_armed()
+                    self.app.model.f_delay = f_delay
                     rearm_if_required()
 
                 case WorkerMessage.Quit():

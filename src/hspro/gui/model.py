@@ -254,8 +254,15 @@ class ChannelModel(ModelBase):
 
     @ten_x_probe.setter
     def ten_x_probe(self, value: bool):
+        original_ten_x_probe_value = self.__ten_x_probe.value
         self.__ten_x_probe.value = self.__ten_x_probe.setter(value)
-        if self.board_model.board is not None:
+        if self.board_model.board is None:
+            if original_ten_x_probe_value != value:
+                if value:
+                    self.__dV.value = self.__dV.value * 10
+                else:
+                    self.__dV.value = self.__dV.value / 10
+        else:
             self.board_model.board.set_channel_10x_probe(self.channel_num, value)
 
     @property
@@ -485,6 +492,7 @@ class BoardModel(ModelBase):
     def delay(self, value: int):
         self.__delay.value = self.__delay.setter(value)
         # TODO: Add control in live board API
+        self.board
 
     @property
     def f_delay(self) -> int:

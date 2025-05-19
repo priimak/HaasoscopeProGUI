@@ -8,6 +8,7 @@ from pytide6 import VBoxPanel, VBoxLayout, PushButton, Label, HBoxPanel, ComboBo
 from hspro.gui.app import App, WorkerMessage
 from hspro.gui.buttons import ZeroButton
 from hspro.gui.model import TriggerTypeModel
+from hspro.gui.scene import SceneCheckpoint
 
 
 class TrigLevelSlider(QSlider):
@@ -84,6 +85,7 @@ class TriggerPanel(VBoxPanel):
         self.trigger_level.setMaximum(255)
         self.trigger_level.setSliderPosition(255 * (app.model.trigger.level + 1) / 2)
         self.trigger_level.valueChanged.connect(self.trigger_level_callback)
+        # self.trigger_level.sliderMoved.connect(self.trigger_level_callback)
         self.app.set_trigger_level_from_plot_line = \
             lambda value: self.trigger_level.setSliderPosition(255 * (value + 1) / 2)
         trig_level_panel = VBoxPanel([
@@ -120,17 +122,13 @@ class TriggerPanel(VBoxPanel):
         if app.model.trigger.trigger_type == TriggerTypeModel.EXTERNAL_SIGNAL:
             self.channel_selector.setEnabled(False)
 
-        main_panel.addWidget(HBoxPanel(
-            widgets=[
-                ComboBox(
-                    items=["Rising Edge", "Falling Edge", "External Signal"],
-                    current_selection=app.model.trigger.trigger_type.value,
-                    min_width=100,
-                    on_text_change=self.trigger_type_callback
-                ),
-            ],
-            margins=0
-        ))
+        self.trigger_type = ComboBox(
+            items=["Rising Edge", "Falling Edge", "External Signal"],
+            current_selection=app.model.trigger.trigger_type.value, min_width=100,
+            on_text_change=self.trigger_type_callback
+        )
+
+        main_panel.addWidget(HBoxPanel(widgets=[self.trigger_type], margins=0))
         main_panel.addWidget(HBoxPanel(widgets=[self.channel_selector], margins=0))
 
         tplabel = Label("Tigger Position")
@@ -177,6 +175,17 @@ class TriggerPanel(VBoxPanel):
             return set_ch_color
 
         self.app.set_channel_color = mk_set_ch_color()
+
+        def apply_checkpoint(cpt: SceneCheckpoint):
+            self.channel_selector.setCurrentIndex(cpt.trigger_on_channel)
+            self.trigger_type.setCurrentText(cpt.trigger_type)
+            app.worker.messages.put(WorkerMessage.SetTriggerToT(cpt.trigger_tot))
+            app.worker.messages.put(WorkerMessage.SetTriggerDelta(cpt.trigger_delta))
+            self.trigger_level.setValue(int(255 * (cpt.trigger_level + 1) / 2))
+            self.trigger_position_slider.setValue(int(cpt.trigger_position * 3999))
+            app.model.trigger.auto_frequency = cpt.trigger_auto_frequency
+
+        self.app.apply_checkpoint_to_trigger_panel = apply_checkpoint
 
     def trigger_armed_single(self):
         with self.selected_button_lock:
@@ -242,8 +251,9 @@ class TriggerPanel(VBoxPanel):
             WorkerMessage.SetTriggerPosition(self.trigger_position_slider.value() / 3999.0)
         )
 
-    def trigger_level_callback(self):
-        self.app.worker.messages.put(WorkerMessage.SetTriggerLevel(self.trigger_level.value() * 2 / 255 - 1))
+    def trigger_level_callback(self, level: int):
+        print(f"trigger_level_callback({level})")
+        self.app.worker.messages.put(WorkerMessage.SetTriggerLevel(level * 2 / 255 - 1))
 
     def set_trigger_pos_from_plot_line(self, value):
         if value != self.app.model.trigger.position:

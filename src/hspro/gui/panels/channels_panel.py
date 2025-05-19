@@ -9,6 +9,7 @@ from unlib import MetricValue, Scale
 from hspro.gui.app import App, WorkerMessage
 from hspro.gui.buttons import ZeroButton
 from hspro.gui.model import ChannelCouplingModel, ChannelImpedanceModel
+from hspro.gui.scene import SceneCheckpoint
 
 
 class VperDivSpinner(QDoubleSpinBox):
@@ -36,21 +37,26 @@ class VperDivSpinner(QDoubleSpinBox):
             index_offset=-steps
         )
         self.app.worker.messages.put(
-            WorkerMessage.SetVoltagePerDiv(self.channel, self.voltage_per_division.to_float(Scale.UNIT))
+            WorkerMessage.SetVoltagePerDiv(self.channel, self.voltage_per_division.to_float(Scale.UNIT), False)
         )
 
         self.setValue(self.voltage_per_division.value)
         self.setSuffix(f" {self.voltage_per_division.scale.to_str()}V/div")
 
     def update_due_to_10x_change(self):
-        if self.app.model.channel[self.channel].ten_x_probe:
-            self.voltage_per_division *= 10
-        else:
-            self.voltage_per_division /= 10
+        print("update_due_to_10x_change ...")
+        dV = self.app.model.channel[self.channel].dV
+        self.voltage_per_division = MetricValue(self.app.model.channel[self.channel].dV, Scale.UNIT, "V").optimize()
+        if self.channel == 0:
+            print(f"update_due_to_10x_change :: dV = {dV} for {self.channel} -> {self.voltage_per_division.value}")
+        # if self.app.model.channel[self.channel].ten_x_probe:
+        #     self.voltage_per_division *= 10
+        # else:
+        #     self.voltage_per_division /= 10
         self.setValue(self.voltage_per_division.value)
         self.setSuffix(f" {self.voltage_per_division.scale.to_str()}V/div")
         self.app.worker.messages.put(
-            WorkerMessage.SetVoltagePerDiv(self.channel, self.voltage_per_division.to_float(Scale.UNIT))
+            WorkerMessage.SetVoltagePerDiv(self.channel, self.voltage_per_division.to_float(Scale.UNIT), False)
         )
 
 
@@ -99,6 +105,11 @@ class VoltageOffsetSpinner(QDoubleSpinBox):
         self.setValue(self.offset.value)
         self.setSuffix(f" {self.offset.scale.to_str()}V")
 
+    def setValue(self, v: float):
+        super().setValue(v)
+        if self.channel == 0:
+            print(f"offset::setValue({v}) for {self.channel}")
+
 
 class ChannelsPanel(VBoxPanel):
     min_width = 230
@@ -109,6 +120,8 @@ class ChannelsPanel(VBoxPanel):
         self.app.deselect_channel = self.deselect_channel
         self.setAutoFillBackground(True)
         self.channel_selectors = []
+        self.channel_color_selectors = []
+        self.channel_active_cbs = []
         self.spws = []
         self.trigger_on_labels = []
         vdiv_spinners = []
@@ -139,6 +152,7 @@ class ChannelsPanel(VBoxPanel):
             channel_name = f"Ch #{channel}"
 
             channel_color_selector = Label(" ")
+            self.channel_color_selectors.append(channel_color_selector)
             channel_color_selector.setMinimumWidth(100)
             channel_color_selector.setMaximumWidth(100)
 
@@ -213,15 +227,17 @@ class ChannelsPanel(VBoxPanel):
 
             trigger_on_label = Label("")
             self.trigger_on_labels.append(trigger_on_label)
+            active_cb = CheckBox(
+                "Active",
+                on_change=self.channel_active_callback(channel, channel_config_panel),
+                checked=app.model.channel[channel].active
+            )
+            self.channel_active_cbs.append(active_cb)
             channel_panel = VBoxPanel(widgets=[
                 HBoxPanel([W(Label(channel_name), stretch=1), trigger_on_label, channel_color_selector], margins=0),
-                CheckBox(
-                    "Active",
-                    on_change=self.channel_active_callback(channel, channel_config_panel),
-                    checked=app.model.channel[channel].active
-                ),
-                channel_config_panel]
-            )
+                active_cb,
+                channel_config_panel
+            ])
             self.app.update_trigger_on_channel_label = self.update_trigger_on_channel_label
 
             if not app.model.channel[channel].active:
@@ -251,6 +267,30 @@ class ChannelsPanel(VBoxPanel):
         self.layout().addStretch(10)
         self.app.correct_offset = lambda channel: offset_spinners[channel].correctOffsetValue()
         self.app.correct_dV = lambda channel: vdiv_spinners[channel].update_due_to_10x_change()
+
+        def apply_checkpoint(cpt: SceneCheckpoint):
+            for channel, cdata in enumerate(cpt.channels):
+                # active
+                self.channel_active_cbs[channel].setChecked(cdata.active)
+
+                # color
+                app.model.channel[channel].color = cdata.color
+                self.channel_color_selectors[channel].setStyleSheet(
+                    f"background-color:{cdata.color}; border: 1px solid black;"
+                )
+                app.model.channel[channel].color = cdata.color
+                app.set_channel_color(channel, cdata.color)
+
+                # offset_V
+                self.app.worker.messages.put(WorkerMessage.SetVoltagePerDiv(channel, cdata.dV, True))
+                self.app.worker.messages.put(WorkerMessage.SetChannelOffset(channel, cdata.offset_V))
+
+            app.update_trigger_lines_color(app.model.trigger.on_channel)
+
+            if cpt.selected_channel > -1:
+                self.app.worker.messages.put(WorkerMessage.SelectChannel(cpt.selected_channel))
+
+        self.app.apply_checkpoint_to_channels_panel = apply_checkpoint
 
     def channel_active_callback(self, channel: int, channel_config_panel: VBoxPanel) -> Callable[[bool], None]:
         def channel_active(active: bool):

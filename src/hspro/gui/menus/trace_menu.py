@@ -2,8 +2,9 @@ from PySide6.QtGui import QAction, Qt
 from PySide6.QtWidgets import QMenu, QMenuBar, QWidgetAction, QSlider, QLabel
 from pytide6 import HBoxPanel
 
-from hspro.gui.app import App
+from hspro.gui.app import App, WorkerMessage
 from hspro.gui.read_out_options_dialog import ReadOutOptionsDialog
+from hspro.gui.scene import SceneCheckpoint
 
 
 class TraceMenu(QMenu):
@@ -34,13 +35,13 @@ class TraceMenu(QMenu):
         self.show_y_axis_labels = QAction("Show Y-Axis labels", self)
         self.show_y_axis_labels.setCheckable(True)
         self.show_y_axis_labels.setChecked(app.app_persistence.config.get_by_xpath("/show_y_axis_labels"))
-        self.show_y_axis_labels.triggered.connect(self.set_show_y_axis_labels)
+        self.show_y_axis_labels.toggled.connect(self.set_show_y_axis_labels)
         self.addAction(self.show_y_axis_labels)
 
         self.show_grid = QAction("Show &Grid", self)
         self.show_grid.setCheckable(True)
         self.show_grid.setChecked(app.app_persistence.config.get_by_xpath("/show_grid"))
-        self.show_grid.triggered.connect(self.set_show_grid_state)
+        self.show_grid.toggled.connect(self.set_show_grid_state)
         self.addAction(self.show_grid)
 
         ################### Grid Opacity
@@ -58,19 +59,19 @@ class TraceMenu(QMenu):
         self.show_trig_level_line = QAction("Show &Trigger Level Line", self)
         self.show_trig_level_line.setCheckable(True)
         self.show_trig_level_line.setChecked(app.app_persistence.config.get_by_xpath("/show_trigger_level_line"))
-        self.show_trig_level_line.triggered.connect(self.set_show_trigger_level_line)
+        self.show_trig_level_line.toggled.connect(self.set_show_trigger_level_line)
         self.addAction(self.show_trig_level_line)
 
         self.show_trig_pos_line = QAction("Show &Trigger Position Line", self)
         self.show_trig_pos_line.setCheckable(True)
         self.show_trig_pos_line.setChecked(app.app_persistence.config.get_by_xpath("/show_trigger_position_line"))
-        self.show_trig_pos_line.triggered.connect(self.set_show_trig_pos_line)
+        self.show_trig_pos_line.toggled.connect(self.set_show_trig_pos_line)
         self.addAction(self.show_trig_pos_line)
 
         self.show_zero_line = QAction("Show &Zero Line", self)
         self.show_zero_line.setCheckable(True)
         self.show_zero_line.setChecked(app.app_persistence.config.get_by_xpath("/show_zero_line"))
-        self.show_zero_line.triggered.connect(self.set_show_zero_line_state)
+        self.show_zero_line.toggled.connect(self.set_show_zero_line_state)
         self.addAction(self.show_zero_line)
 
         plot_color_scheme_menu = self.addMenu("Color &Scheme")
@@ -88,6 +89,28 @@ class TraceMenu(QMenu):
         plot_color_scheme = app.app_persistence.config.get_value("plot_color_scheme")
         self.plot_color_scheme_light.setChecked(plot_color_scheme == "light")
         self.plot_color_scheme_dark.setChecked(plot_color_scheme == "dark")
+
+        def apply_checkpoint(cpt: SceneCheckpoint):
+            match cpt.plot_color_scheme:
+                case "light":
+                    self.set_plot_color_scheme_light()
+                case "dark":
+                    self.set_plot_color_scheme_dark()
+
+            self.show_trig_level_line.setChecked(cpt.show_trigger_level_line)
+            self.show_trig_pos_line.setChecked(cpt.show_trigger_position_line)
+            self.show_grid.setChecked(cpt.show_grid)
+            self.show_y_axis_labels.setChecked(cpt.show_y_axis_labels)
+            self.show_zero_line.setChecked(cpt.show_zero_line)
+
+            app.worker.messages.put(WorkerMessage.SetHighres(cpt.highres))
+            app.worker.messages.put(WorkerMessage.SetMemoryDepth(cpt.mem_depth))
+            app.worker.messages.put(WorkerMessage.SetDelay(cpt.delay))
+            app.worker.messages.put(WorkerMessage.SetFDelay(cpt.f_delay))
+
+            # TODO: add visual_time_scale
+
+        self.app.apply_checkpoint_to_trace_menu = apply_checkpoint
 
     def set_plot_color_scheme_light(self):
         self.plot_color_scheme_light.setChecked(True)

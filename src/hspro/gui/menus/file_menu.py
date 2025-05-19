@@ -10,8 +10,6 @@ class FileMenu(QMenu):
         self.app = app
 
         self.addAction("&Take screenshot", app.take_screenshot)
-        self.addAction("&Save session")
-        self.addAction("&Open session")
         self.addSeparator()
         self.addAction("&Settings", self.show_settings_dialog)
         self.addAction("&Quit", lambda: app.exit_application())
