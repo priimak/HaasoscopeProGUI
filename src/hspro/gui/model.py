@@ -13,6 +13,8 @@ from hspro_api.time_constants import TimeConstants
 from sprats.config import AppPersistence
 from unlib import Duration, MetricValue, TimeUnit
 
+from hspro.gui.scene import SceneCheckpoint
+
 VISUAL_TIME_PER_DIVISION = [
     Duration(1, TimeUnit.NS),
     Duration(2, TimeUnit.NS),
@@ -434,6 +436,7 @@ class BoardModel(ModelBase):
         )
         self.__demo_last_time_waveform_available = time.time()
         self.__time_scale = Duration.value_of("0s")
+        self.checkpoint: SceneCheckpoint | None = None
 
     def cleanup(self):
         if self.board is not None:
@@ -667,6 +670,27 @@ class BoardModel(ModelBase):
                         return WaveformUnavailable()
         else:
             return self.board.wait_for_waveform(0)
+
+    def get_checkpoint_waveforms(self) -> tuple[Optional[Waveform], Optional[Waveform]]:
+        if self.checkpoint is None:
+            return None, None
+        else:
+            waveforms = []
+            for cdata in self.checkpoint.channels:
+                if not cdata.active:
+                    waveforms.append(None)
+                else:
+
+                    waveforms.append(Waveform(
+                        dt_s=cdata.dt_s,
+                        vs=cdata.v,
+
+                        # the rest is ignored for plotting
+                        trigger_pos=0,
+                        dV=0,
+                        trigger_level_V=0
+                    ))
+            return tuple(waveforms)
 
     def get_waveforms(self) -> tuple[Optional[Waveform], Optional[Waveform]]:
         if self.board is None:

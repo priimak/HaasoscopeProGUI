@@ -380,11 +380,12 @@ class PlotsPanel(GraphicsLayoutWidget):
     def channel_active_state_changed(self, channel: int, active: bool):
         self.traces[channel].setVisible(active)
 
-    def channel_color_changed(self, channel: int, color: str):
+    def channel_color_changed(self, channel: int, color: str, select_channel: bool):
         self.pens[channel].setColor(color)
         self.brushes[channel].setColor(color)
         self.traces[channel].setPen(self.pens[channel])
-        self.app.worker.messages.put(WorkerMessage.SelectChannel(channel))
+        if select_channel:
+            self.app.worker.messages.put(WorkerMessage.SelectChannel(channel))
         self.y_axis.setTextPen(self.pens[channel])
         self.zero_line.setPen(self.pens[channel])
         self.zero_marker.setBrush(self.brushes[channel])

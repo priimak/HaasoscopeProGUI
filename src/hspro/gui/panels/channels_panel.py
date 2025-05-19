@@ -44,15 +44,7 @@ class VperDivSpinner(QDoubleSpinBox):
         self.setSuffix(f" {self.voltage_per_division.scale.to_str()}V/div")
 
     def update_due_to_10x_change(self):
-        print("update_due_to_10x_change ...")
-        dV = self.app.model.channel[self.channel].dV
         self.voltage_per_division = MetricValue(self.app.model.channel[self.channel].dV, Scale.UNIT, "V").optimize()
-        if self.channel == 0:
-            print(f"update_due_to_10x_change :: dV = {dV} for {self.channel} -> {self.voltage_per_division.value}")
-        # if self.app.model.channel[self.channel].ten_x_probe:
-        #     self.voltage_per_division *= 10
-        # else:
-        #     self.voltage_per_division /= 10
         self.setValue(self.voltage_per_division.value)
         self.setSuffix(f" {self.voltage_per_division.scale.to_str()}V/div")
         self.app.worker.messages.put(
@@ -105,11 +97,6 @@ class VoltageOffsetSpinner(QDoubleSpinBox):
         self.setValue(self.offset.value)
         self.setSuffix(f" {self.offset.scale.to_str()}V")
 
-    def setValue(self, v: float):
-        super().setValue(v)
-        if self.channel == 0:
-            print(f"offset::setValue({v}) for {self.channel}")
-
 
 class ChannelsPanel(VBoxPanel):
     min_width = 230
@@ -122,6 +109,9 @@ class ChannelsPanel(VBoxPanel):
         self.channel_selectors = []
         self.channel_color_selectors = []
         self.channel_active_cbs = []
+        self.channel_coupling_cbs = []
+        self.channel_impedance_cbs = []
+        self.channel_10x_cbs = []
         self.spws = []
         self.trigger_on_labels = []
         vdiv_spinners = []
@@ -130,7 +120,9 @@ class ChannelsPanel(VBoxPanel):
         def mk_select_op(ch: int):
             def select_op(event):
                 if self.app.model.channel[ch].active:
-                    if (event is not None and event.modifiers() == Qt.KeyboardModifier.ControlModifier):
+                    if (event is not None and
+                            isinstance(event, QMouseEvent) and
+                            event.modifiers() == Qt.KeyboardModifier.ControlModifier):
                         # we use this to select this channel for trigger
                         self.app.set_trigger_on_channel(ch)
                         return
@@ -169,7 +161,7 @@ class ChannelsPanel(VBoxPanel):
                             )
                             color_selector.color = new_color
                             app.model.channel[channel].color = new_color
-                            app.set_channel_color(channel, new_color)
+                            app.set_channel_color(channel, new_color, True)
                             app.update_trigger_lines_color(app.model.trigger.on_channel)
 
                 return select_color
@@ -185,44 +177,36 @@ class ChannelsPanel(VBoxPanel):
             voffset = VoltageOffsetSpinner(channel, app)
             offset_spinners.append(voffset)
 
+            channel_coupling_cb = ComboBox(
+                items=[ChannelCouplingModel.DC.value, ChannelCouplingModel.AC.value],
+                current_selection=app.model.channel[channel].coupling.value,
+                min_width=100,
+                on_text_change=self.coupling_change_callback(channel),
+                on_focus=mk_select_op(channel)
+            )
+            self.channel_coupling_cbs.append(channel_coupling_cb)
+            impedance_cb = ComboBox(
+                items=[ChannelImpedanceModel.FIFTY_OHM.value, ChannelImpedanceModel.ONE_MEGA_OHM.value],
+                current_selection=app.model.channel[channel].impedance.value,
+                min_width=100,
+                on_text_change=self.impedance_change_callback(channel),
+                on_focus=mk_select_op(channel)
+            )
+            self.channel_impedance_cbs.append(impedance_cb)
+            ten_x_cb = CheckBox(on_change=self.ten_x_callback(channel), checked=app.model.channel[channel].ten_x_probe)
+            self.channel_10x_cbs.append(ten_x_cb)
             channel_config_panel = VBoxPanel(widgets=[
                 HBoxPanel(widgets=[vdiv, W(Label("Scale"), stretch=10)], margins=0),
                 HBoxPanel(
                     widgets=[voffset, ZeroButton(voffset.resetToZero), W(Label("Offset"), stretch=10)],
                     margins=0
                 ),
+                HBoxPanel(widgets=[channel_coupling_cb, Label("Coupling"), QSpacerItem], margins=0),
+                HBoxPanel(widgets=[impedance_cb, Label("Impedance"), QSpacerItem], margins=0),
                 HBoxPanel(
-                    widgets=[
-                        ComboBox(
-                            items=[ChannelCouplingModel.DC.value, ChannelCouplingModel.AC.value],
-                            current_selection=app.model.channel[channel].coupling.value,
-                            min_width=100,
-                            on_text_change=self.coupling_change_callback(channel),
-                            on_focus=mk_select_op(channel)
-                        ),
-                        Label("Coupling"),
-                        QSpacerItem
-                    ],
-                    margins=0
+                    widgets=[ten_x_cb, W(Label("10x probe"), stretch=10, alignment=Qt.AlignmentFlag.AlignLeft)],
+                    margins=(0, 5, 0, 0)
                 ),
-                HBoxPanel(
-                    widgets=[
-                        ComboBox(
-                            items=[ChannelImpedanceModel.FIFTY_OHM.value, ChannelImpedanceModel.ONE_MEGA_OHM.value],
-                            current_selection=app.model.channel[channel].impedance.value,
-                            min_width=100,
-                            on_text_change=self.impedance_change_callback(channel),
-                            on_focus=mk_select_op(channel)
-                        ),
-                        Label("Impedance"),
-                        QSpacerItem
-                    ],
-                    margins=0
-                ),
-                HBoxPanel(widgets=[
-                    CheckBox(on_change=self.ten_x_callback(channel), checked=app.model.channel[channel].ten_x_probe),
-                    W(Label("10x probe"), stretch=10, alignment=Qt.AlignmentFlag.AlignLeft)
-                ], margins=(0, 5, 0, 0)),
             ])
 
             trigger_on_label = Label("")
@@ -279,11 +263,19 @@ class ChannelsPanel(VBoxPanel):
                     f"background-color:{cdata.color}; border: 1px solid black;"
                 )
                 app.model.channel[channel].color = cdata.color
-                app.set_channel_color(channel, cdata.color)
+                app.set_channel_color(channel, cdata.color, False)
 
-                # offset_V
+                self.app.worker.messages.put(
+                    WorkerMessage.SetChannel10x(channel, cdata.ten_x_probe, update_visual_controls=True)
+                )
                 self.app.worker.messages.put(WorkerMessage.SetVoltagePerDiv(channel, cdata.dV, True))
                 self.app.worker.messages.put(WorkerMessage.SetChannelOffset(channel, cdata.offset_V))
+                self.app.worker.messages.put(WorkerMessage.SetChannelCoupling(
+                    channel, ChannelCouplingModel.value_of(cdata.coupling), update_visual_controls=True
+                ))
+                self.app.worker.messages.put(WorkerMessage.SetChannelImpedance(
+                    channel, ChannelImpedanceModel.value_of(cdata.impedance), update_visual_controls=True
+                ))
 
             app.update_trigger_lines_color(app.model.trigger.on_channel)
 
@@ -291,6 +283,11 @@ class ChannelsPanel(VBoxPanel):
                 self.app.worker.messages.put(WorkerMessage.SelectChannel(cpt.selected_channel))
 
         self.app.apply_checkpoint_to_channels_panel = apply_checkpoint
+        self.app.update_channel_coupling = \
+            lambda channel, coupling: self.channel_coupling_cbs[channel].setCurrentText(coupling.value)
+        self.app.update_channel_impedance = \
+            lambda channel, impedance: self.channel_impedance_cbs[channel].setCurrentText(impedance.value)
+        self.app.update_channel_10x = lambda channel, ten_x: self.channel_10x_cbs[channel].setChecked(ten_x)
 
     def channel_active_callback(self, channel: int, channel_config_panel: VBoxPanel) -> Callable[[bool], None]:
         def channel_active(active: bool):

@@ -164,8 +164,8 @@ class TriggerPanel(VBoxPanel):
         def mk_set_ch_color():
             f = self.app.set_channel_color
 
-            def set_ch_color(channel: int, color: str):
-                f(channel, color)
+            def set_ch_color(channel: int, color: str, select_channel: bool):
+                f(channel, color, select_channel)
                 px = self.channels_pixmaps[channel]
                 qp = QPainter(px)
                 qp.fillRect(QRect(1, 1, 20, 15), color)
@@ -252,7 +252,6 @@ class TriggerPanel(VBoxPanel):
         )
 
     def trigger_level_callback(self, level: int):
-        print(f"trigger_level_callback({level})")
         self.app.worker.messages.put(WorkerMessage.SetTriggerLevel(level * 2 / 255 - 1))
 
     def set_trigger_pos_from_plot_line(self, value):

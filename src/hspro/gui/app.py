@@ -27,6 +27,8 @@ class App:
     set_connection_status_label: Callable[[str], None] = lambda _: None
     set_live_info_label: Callable[[str], None] = lambda _: None
     update_scene_data: Callable[[Scene], None] = lambda _: None
+    update_scene_history_dialog: Callable[[Scene], None] = lambda _: None
+    show_scene_history: Callable[[], None] = lambda: None
     set_plot_color_scheme: Callable[[str], None] = lambda _: None
     channels: list[int] = [0, 1]
     set_trigger_level_from_plot_line: Callable[[float], None] = lambda _: None
@@ -36,7 +38,7 @@ class App:
     select_channel_in_plot: Callable[[int], None] = lambda _: None
     deselect_channel: Callable[[int], None] = lambda _: None
     remove_all_y_axis_ticks_labels: Callable[[], None] = lambda: None
-    set_channel_color: Callable[[int, str], None] = lambda a, b: None
+    set_channel_color: Callable[[int, str, bool], None] = lambda a, b, c: None
     set_show_grid_state: Callable[[bool], None] = lambda _: None
     set_show_y_axis_labels: Callable[[bool], None] = lambda _: None
     set_show_zero_line: Callable[[bool], None] = lambda _: None
@@ -54,6 +56,9 @@ class App:
     correct_trigger_level: Callable[[float], None] = lambda _: None
     correct_offset: Callable[[int], None] = lambda _: None
     correct_dV: Callable[[int], None] = lambda _: None
+    update_channel_coupling: Callable[[int, ChannelCouplingModel], None] = lambda a, b: None
+    update_channel_impedance: Callable[[int, ChannelImpedanceModel], None] = lambda a, b: None
+    update_channel_10x: Callable[[int, bool], None] = lambda a, b: None
     plot_waveforms: Callable[[tuple[Optional[Waveform], Optional[Waveform]]], None] = lambda _: None
     update_y_axis_ticks: Callable[[int | None], None] = lambda _: None
     set_grid_opacity: Callable[[float], None] = lambda _: None
@@ -84,17 +89,21 @@ class App:
 
         self.board_thread_pool = QThreadPool()
         self.worker = GUIWorker(self)
-        self.worker.msg_out.disarm_trigger.connect(self.do_disarm_trigger)
-        self.worker.msg_out.trigger_armed_single.connect(self.do_trigger_armed_single)
-        self.worker.msg_out.trigger_armed_normal.connect(self.do_trigger_armed_normal)
-        self.worker.msg_out.trigger_armed_auto.connect(self.do_trigger_armed_auto)
+        conn_type = Qt.ConnectionType.BlockingQueuedConnection
+        self.worker.msg_out.disarm_trigger.connect(self.do_disarm_trigger, conn_type)
+        self.worker.msg_out.trigger_armed_single.connect(self.do_trigger_armed_single, conn_type)
+        self.worker.msg_out.trigger_armed_normal.connect(self.do_trigger_armed_normal, conn_type)
+        self.worker.msg_out.trigger_armed_auto.connect(self.do_trigger_armed_auto, conn_type)
         self.worker.msg_out.trigger_armed_forced_acq.connect(self.do_trigger_armed_forced_acq)
-        self.worker.msg_out.plot_waveforms.connect(self.do_plot_waveforms, Qt.ConnectionType.QueuedConnection)
-        self.worker.msg_out.update_y_ticks.connect(self.do_update_y_axis_ticks)
-        self.worker.msg_out.correct_trigger_position.connect(self.do_correct_trigger_position)
-        self.worker.msg_out.correct_trigger_level.connect(self.do_correct_trigger_level)
-        self.worker.msg_out.correct_offset.connect(self.do_correct_offset)
-        self.worker.msg_out.correct_dV.connect(self.do_correct_dV)
+        self.worker.msg_out.plot_waveforms.connect(self.do_plot_waveforms, conn_type)
+        self.worker.msg_out.update_y_ticks.connect(self.do_update_y_axis_ticks, conn_type)
+        self.worker.msg_out.correct_trigger_position.connect(self.do_correct_trigger_position, conn_type)
+        self.worker.msg_out.correct_trigger_level.connect(self.do_correct_trigger_level, conn_type)
+        self.worker.msg_out.correct_offset.connect(self.do_correct_offset, conn_type)
+        self.worker.msg_out.correct_dV.connect(self.do_correct_dV, conn_type)
+        self.worker.msg_out.update_channel_coupling.connect(self.do_update_channel_coupling, conn_type)
+        self.worker.msg_out.update_channel_impedance.connect(self.do_update_channel_impedance, conn_type)
+        self.worker.msg_out.update_channel_10x.connect(self.do_update_channel_10x, conn_type)
         self.board_thread_pool.start(self.worker)
 
     def create_new_scene(self):
@@ -190,6 +199,7 @@ class App:
         self.apply_checkpoint_to_trace_menu(checkpoint)
         self.apply_checkpoint_to_trigger_panel(checkpoint)
         self.apply_checkpoint_to_channels_panel(checkpoint)
+        self.worker.messages.put(WorkerMessage.PlotFromCheckpoint(checkpoint_num))
         self.worker.messages.put(WorkerMessage.Disarm(disable_queue_draining=False))
 
     def init(self):
@@ -235,23 +245,27 @@ class App:
 
     def open_scene(self):
         while True:
-            last_used_dir = self.app_persistence.state.get_value("last_dir_scene", f"{Path.home().absolute()}")
-            file, _ = QFileDialog.getOpenFileName(None, "Open scene", dir=last_used_dir, filter="*.hss")
-            if file == "":
+            try:
+                last_used_dir = self.app_persistence.state.get_value("last_dir_scene", f"{Path.home().absolute()}")
+                file, _ = QFileDialog.getOpenFileName(None, "Open scene", dir=last_used_dir, filter="*.hss")
+                if file != "":
+                    self.scene_file = Path(file).with_suffix(".hss")
+                    self.app_persistence.state.set_value("last_dir_scene", f"{self.scene_file.parent.absolute()}")
+                    json_data = json.loads(self.scene_file.read_text())
+                    self.scene = Scene.value_of(json_data)
+                    self.do_update_scene_data(self.scene)
+                    self.worker.messages.put(WorkerMessage.Disarm())
+                    self.show_scene_history()
                 break
-            else:
-                self.scene_file = Path(file).with_suffix(".hss")
-                self.app_persistence.state.set_value("last_dir_scene", f"{self.scene_file.parent.absolute()}")
-                json_data = json.loads(self.scene_file.read_text())
-                self.scene = Scene.value_of(json_data)
-                self.do_update_scene_data(self.scene)
-                break
+            except Exception as ex:
+                QMessageBox.critical(None, "Error", f"Error: Failed to open scene file.\n{ex}")
 
     def save_scene(self):
         self.scene_file.write_text(json.dumps(dataclasses.asdict(self.scene), indent=2))
 
     def do_update_scene_data(self, scene: Scene):
         self.update_scene_data(scene)
+        self.update_scene_history_dialog(scene)
 
     def do_disarm_trigger(self):
         self.trigger_disarmed()
@@ -294,6 +308,15 @@ class App:
 
     def do_correct_dV(self, channel: int):
         self.correct_dV(channel)
+
+    def do_update_channel_coupling(self, channel: int, coupling: ChannelCouplingModel):
+        self.update_channel_coupling(channel, coupling)
+
+    def do_update_channel_impedance(self, channel: int, impedance: ChannelImpedanceModel):
+        self.update_channel_impedance(channel, impedance)
+
+    def do_update_channel_10x(self, channel: int, ten_x: bool):
+        self.update_channel_10x(channel, ten_x)
 
     def do_select_channel(self, channel: int):
         self.set_selected_channel(channel)
@@ -356,6 +379,12 @@ class WorkerMessage:
         def __init__(self, disable_queue_draining: bool = False):
             self.disable_queue_draining = disable_queue_draining
 
+    class PlotFromCheckpoint:
+        __match_args__ = ("checkpoint_num",)
+
+        def __init__(self, checkpoint_num: int):
+            self.checkpoint_num = checkpoint_num - 1
+
     class PlotAndDisarm:
         pass
 
@@ -416,11 +445,12 @@ class WorkerMessage:
             self.update_visual_controls = update_visual_controls
 
     class SetChannel10x:
-        __match_args__ = ("channel", "ten_x",)
+        __match_args__ = ("channel", "ten_x", "update_visual_controls")
 
-        def __init__(self, channel: int, ten_x: bool):
+        def __init__(self, channel: int, ten_x: bool, update_visual_controls: bool = False):
             self.channel = channel
             self.ten_x = ten_x
+            self.update_visual_controls = update_visual_controls
 
     class SetChannelActive:
         __match_args__ = ("channel", "active",)
@@ -430,18 +460,20 @@ class WorkerMessage:
             self.active = active
 
     class SetChannelCoupling:
-        __match_args__ = ("channel", "coupling",)
+        __match_args__ = ("channel", "coupling", "update_visual_controls")
 
-        def __init__(self, channel: int, coupling: ChannelCouplingModel):
+        def __init__(self, channel: int, coupling: ChannelCouplingModel, update_visual_controls: bool = False):
             self.channel = channel
             self.coupling = coupling
+            self.update_visual_controls = update_visual_controls
 
     class SetChannelImpedance:
-        __match_args__ = ("channel", "impedance",)
+        __match_args__ = ("channel", "impedance", "update_visual_controls")
 
-        def __init__(self, channel: int, impedance: ChannelImpedanceModel):
+        def __init__(self, channel: int, impedance: ChannelImpedanceModel, update_visual_controls: bool = False):
             self.channel = channel
             self.impedance = impedance
+            self.update_visual_controls = update_visual_controls
 
     class SetChannelOffset:
         __match_args__ = ("channel", "offset_V",)
@@ -489,6 +521,9 @@ class MessagesFromGUIWorker(QObject):
     trigger_armed_forced_acq = Signal()
     correct_offset = Signal(int)
     correct_dV = Signal(int)
+    update_channel_coupling = Signal(int, ChannelCouplingModel)
+    update_channel_impedance = Signal(int, ChannelImpedanceModel)
+    update_channel_10x = Signal(int, ChannelImpedanceModel)
     update_y_ticks = Signal(int)
 
 
@@ -646,6 +681,11 @@ class GUIWorker(QRunnable, ):
                     self.msg_out.disarm_trigger.emit()
                     self.arm_type = ArmType.DISARMED
 
+                case WorkerMessage.PlotFromCheckpoint(checkpoint_num):
+                    self.app.model.checkpoint = self.app.scene.data[checkpoint_num]
+                    w1, w2 = self.app.model.get_checkpoint_waveforms()
+                    self.msg_out.plot_waveforms.emit((w1, w2))
+
                 case WorkerMessage.PlotAndDisarm():
                     if is_armed:
                         available = self.app.model.is_capture_available()
@@ -738,21 +778,20 @@ class GUIWorker(QRunnable, ):
                         self.app.model.channel[channel].offset_V = current_offset_V * offset_scaling_factor
                         self.msg_out.correct_offset.emit(channel)
                     self.msg_out.update_y_ticks.emit(channel)
-                    if channel == 0:
-                        print(f"SetVoltagePerDiv({self.app.model.channel[channel].dV}) for {channel}")
-
                     if update_visual_controls:
                         self.msg_out.correct_dV.emit(channel)
 
                     rearm_if_required()
 
-                case WorkerMessage.SetChannel10x(channel, ten_x):
+                case WorkerMessage.SetChannel10x(channel, ten_x, update_visual_controls):
                     if self.drain_queue():
                         break
                     disarm_if_armed()
                     self.app.model.channel[channel].ten_x_probe = ten_x
                     self.msg_out.correct_dV.emit(channel)
                     self.msg_out.update_y_ticks.emit(channel)
+                    if update_visual_controls:
+                        self.msg_out.update_channel_10x.emit(channel, ten_x)
                     rearm_if_required()
 
                 case WorkerMessage.SetChannelActive(channel, active):
@@ -791,18 +830,24 @@ class GUIWorker(QRunnable, ):
 
                     rearm_if_required()
 
-                case WorkerMessage.SetChannelCoupling(channel, coupling):
+                case WorkerMessage.SetChannelCoupling(channel, coupling, update_visual_controls):
                     if self.drain_queue():
                         break
                     disarm_if_armed()
                     self.app.model.channel[channel].coupling = coupling
+
+                    if update_visual_controls:
+                        self.msg_out.update_channel_coupling.emit(channel, coupling)
+
                     rearm_if_required()
 
-                case WorkerMessage.SetChannelImpedance(channel, impedance):
+                case WorkerMessage.SetChannelImpedance(channel, impedance, update_visual_controls):
                     if self.drain_queue():
                         break
                     disarm_if_armed()
                     self.app.model.channel[channel].impedance = impedance
+                    if update_visual_controls:
+                        self.msg_out.update_channel_impedance.emit(channel, impedance)
                     rearm_if_required()
 
                 case WorkerMessage.SetChannelOffset(channel, offset_V):
@@ -812,7 +857,6 @@ class GUIWorker(QRunnable, ):
                     self.app.model.channel[channel].offset_V = offset_V
                     self.msg_out.correct_offset.emit(channel)
                     self.msg_out.update_y_ticks.emit(channel)
-                    print(f"self.app.model.channel[{channel}].offset_V = {self.app.model.channel[channel].offset_V}")
                     rearm_if_required()
 
                 case WorkerMessage.SetMemoryDepth(mem_depth):
