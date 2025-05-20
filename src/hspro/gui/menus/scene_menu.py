@@ -1,10 +1,10 @@
 from typing import Callable
 
-from PySide6.QtCore import QStringListModel, QItemSelection
+from PySide6.QtCore import QStringListModel
 from PySide6.QtWidgets import QMenu, QMenuBar, QWidget, QListView, QAbstractItemView
 from pytide6 import Dialog, VBoxLayout
 
-from hspro.gui.app import App
+from hspro.gui.app import App, WorkerMessage
 from hspro.gui.scene import Scene
 
 
@@ -23,12 +23,13 @@ class SceneHistory(Dialog):
         self.lst_view.setModel(self.hist_model)
         self.lst_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
 
-        def selectionChanged(selected: QItemSelection, _):
-            if selected.count() > 0:
-                selected_row = selected.first().indexes()[0].row()
-                app.activate_scene_checkpoint(len(app.get_scene().data) - selected_row)
+        def on_click():
+            selected_indexes = self.lst_view.selectedIndexes()
+            if selected_indexes != []:
+                selected_row = selected_indexes[0].row()
+                app.worker.messages.put(WorkerMessage.ActivateCheckpoint(len(app.get_scene().data) - selected_row))
 
-        self.lst_view.selectionModel().selectionChanged.connect(selectionChanged)
+        self.lst_view.clicked.connect(on_click)
         self.setLayout(VBoxLayout([self.lst_view]))
 
     def closeEvent(self, arg__1, /):

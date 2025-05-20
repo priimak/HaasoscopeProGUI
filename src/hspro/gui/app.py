@@ -104,6 +104,7 @@ class App:
         self.worker.msg_out.update_channel_coupling.connect(self.do_update_channel_coupling, conn_type)
         self.worker.msg_out.update_channel_impedance.connect(self.do_update_channel_impedance, conn_type)
         self.worker.msg_out.update_channel_10x.connect(self.do_update_channel_10x, conn_type)
+        self.worker.msg_out.apply_checkpoint.connect(self.apply_checkpoint, conn_type)
         self.board_thread_pool.start(self.worker)
 
     def create_new_scene(self):
@@ -124,7 +125,7 @@ class App:
         return self.scene
 
     def record_state_in_scene(self):
-        waveforms = self.model.get_waveforms()
+        waveforms = self.model.get_waveforms(use_last_shown_waveform=True)
         cds: list[ChannelData] = []
         for ch in self.channels:
             wf: Waveform = waveforms[ch]
@@ -189,18 +190,6 @@ class App:
 
         if self.scene_file is not None:
             self.save_scene()
-
-    def activate_scene_checkpoint(self, checkpoint_num: int):
-        self.worker.messages.put(WorkerMessage.Disarm(disable_queue_draining=True))
-        while self.worker.arm_type != ArmType.DISARMED:
-            pass
-
-        checkpoint = self.scene.data[checkpoint_num - 1]
-        self.apply_checkpoint_to_trace_menu(checkpoint)
-        self.apply_checkpoint_to_trigger_panel(checkpoint)
-        self.apply_checkpoint_to_channels_panel(checkpoint)
-        self.worker.messages.put(WorkerMessage.PlotFromCheckpoint(checkpoint_num))
-        self.worker.messages.put(WorkerMessage.Disarm(disable_queue_draining=False))
 
     def init(self):
         plot_color_scheme: str | None = self.app_persistence.config.get_value("plot_color_scheme", str)
@@ -318,6 +307,11 @@ class App:
     def do_update_channel_10x(self, channel: int, ten_x: bool):
         self.update_channel_10x(channel, ten_x)
 
+    def apply_checkpoint(self, checkpoint: SceneCheckpoint):
+        self.apply_checkpoint_to_trace_menu(checkpoint)
+        self.apply_checkpoint_to_trigger_panel(checkpoint)
+        self.apply_checkpoint_to_channels_panel(checkpoint)
+
     def do_select_channel(self, channel: int):
         self.set_selected_channel(channel)
         self.select_channel_in_plot(channel)
@@ -378,6 +372,12 @@ class WorkerMessage:
 
         def __init__(self, disable_queue_draining: bool = False):
             self.disable_queue_draining = disable_queue_draining
+
+    class ActivateCheckpoint:
+        __match_args__ = ("checkpoint_num",)
+
+        def __init__(self, checkpoint_num: int):
+            self.checkpoint_num = checkpoint_num
 
     class PlotFromCheckpoint:
         __match_args__ = ("checkpoint_num",)
@@ -525,6 +525,7 @@ class MessagesFromGUIWorker(QObject):
     update_channel_impedance = Signal(int, ChannelImpedanceModel)
     update_channel_10x = Signal(int, ChannelImpedanceModel)
     update_y_ticks = Signal(int)
+    apply_checkpoint = Signal(SceneCheckpoint)
 
 
 class ArmType(Enum):
@@ -680,6 +681,21 @@ class GUIWorker(QRunnable, ):
                     self.app.model.trigger.force_arm_trigger(TriggerType.DISABLED)
                     self.msg_out.disarm_trigger.emit()
                     self.arm_type = ArmType.DISARMED
+
+                case WorkerMessage.ActivateCheckpoint(checkpoint_num):
+                    if self.drain_queue():
+                        break
+                    self.disable_queue_draining = True
+                    is_armed = False
+                    current_trigger_type = TriggerType.DISABLED
+                    self.app.model.trigger.force_arm_trigger(TriggerType.DISABLED)
+                    self.msg_out.disarm_trigger.emit()
+                    self.arm_type = ArmType.DISARMED
+
+                    checkpoint = self.app.scene.data[checkpoint_num - 1]
+                    self.msg_out.apply_checkpoint.emit(checkpoint)
+                    self.messages.put(WorkerMessage.PlotFromCheckpoint(checkpoint_num))
+                    self.messages.put(WorkerMessage.Disarm(False))
 
                 case WorkerMessage.PlotFromCheckpoint(checkpoint_num):
                     self.app.model.checkpoint = self.app.scene.data[checkpoint_num]

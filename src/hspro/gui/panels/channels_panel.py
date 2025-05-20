@@ -2,17 +2,18 @@ from typing import Callable
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPalette, QMouseEvent, QColor
-from PySide6.QtWidgets import QSpacerItem, QDoubleSpinBox, QColorDialog
+from PySide6.QtWidgets import QSpacerItem, QColorDialog
 from pytide6 import VBoxPanel, CheckBox, ComboBox, Label, HBoxPanel, W
 from unlib import MetricValue, Scale
 
 from hspro.gui.app import App, WorkerMessage
 from hspro.gui.buttons import ZeroButton
+from hspro.gui.gui_ext.spin_boxes import HSProDoubleSpinBox
 from hspro.gui.model import ChannelCouplingModel, ChannelImpedanceModel
 from hspro.gui.scene import SceneCheckpoint
 
 
-class VperDivSpinner(QDoubleSpinBox):
+class VperDivSpinner(HSProDoubleSpinBox):
     def __init__(self, channel: int, app: App):
         super().__init__()
         self.channel = channel
@@ -52,7 +53,7 @@ class VperDivSpinner(QDoubleSpinBox):
         )
 
 
-class VoltageOffsetSpinner(QDoubleSpinBox):
+class VoltageOffsetSpinner(HSProDoubleSpinBox):
     def __init__(self, channel: int, app: App):
         super().__init__()
         self.channel = channel

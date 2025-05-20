@@ -437,6 +437,7 @@ class BoardModel(ModelBase):
         self.__demo_last_time_waveform_available = time.time()
         self.__time_scale = Duration.value_of("0s")
         self.checkpoint: SceneCheckpoint | None = None
+        self.cached_waveforms: tuple[Optional[Waveform], Optional[Waveform]] = (None, None)
 
     def cleanup(self):
         if self.board is not None:
@@ -692,7 +693,12 @@ class BoardModel(ModelBase):
                     ))
             return tuple(waveforms)
 
-    def get_waveforms(self) -> tuple[Optional[Waveform], Optional[Waveform]]:
+    def get_waveforms(self, use_last_shown_waveform: bool = False) -> tuple[Optional[Waveform], Optional[Waveform]]:
+        if not use_last_shown_waveform:
+            self.cached_waveforms = self.__get_waveforms()
+        return self.cached_waveforms
+
+    def __get_waveforms(self) -> tuple[Optional[Waveform], Optional[Waveform]]:
         if self.board is None:
             return self.channel[0].get_demo_waveform(), self.channel[0].get_demo_waveform()
         else:

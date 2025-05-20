@@ -1,11 +1,12 @@
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QDoubleSpinBox, QLabel
+from PySide6.QtWidgets import QLabel
 from pytide6 import VBoxPanel, HBoxPanel, W
 
 from hspro.gui.app import App, WorkerMessage
+from hspro.gui.gui_ext.spin_boxes import HSProDoubleSpinBox
 
 
-class TimeScaleSpinner(QDoubleSpinBox):
+class TimeScaleSpinner(HSProDoubleSpinBox):
     def __init__(self, app: App):
         super().__init__()
         self.app = app
