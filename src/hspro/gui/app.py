@@ -53,6 +53,7 @@ class App:
     trigger_armed_auto: Callable[[], None] = lambda _: None
     trigger_force_acq: Callable[[], None] = lambda _: None
     correct_trigger_position: Callable[[float], None] = lambda _: None
+    replot_waveforms: Callable[[], None] = lambda _: None
     correct_trigger_level: Callable[[float], None] = lambda _: None
     correct_offset: Callable[[int], None] = lambda _: None
     correct_dV: Callable[[int], None] = lambda _: None
@@ -98,6 +99,7 @@ class App:
         self.worker.msg_out.plot_waveforms.connect(self.do_plot_waveforms, conn_type)
         self.worker.msg_out.update_y_ticks.connect(self.do_update_y_axis_ticks, conn_type)
         self.worker.msg_out.correct_trigger_position.connect(self.do_correct_trigger_position, conn_type)
+        self.worker.msg_out.replot_last_waveforms.connect(self.do_replot_waveforms, conn_type)
         self.worker.msg_out.correct_trigger_level.connect(self.do_correct_trigger_level, conn_type)
         self.worker.msg_out.correct_offset.connect(self.do_correct_offset, conn_type)
         self.worker.msg_out.correct_dV.connect(self.do_correct_dV, conn_type)
@@ -288,6 +290,9 @@ class App:
 
     def do_correct_trigger_position(self, position: float):
         self.correct_trigger_position(position)
+
+    def do_replot_waveforms(self):
+        self.replot_waveforms()
 
     def do_correct_trigger_level(self, level: float):
         self.correct_trigger_level(level)
@@ -514,6 +519,7 @@ class MessagesFromGUIWorker(QObject):
     disarm_trigger = Signal()
     plot_waveforms = Signal(tuple)
     correct_trigger_position = Signal(float)
+    replot_last_waveforms = Signal()
     correct_trigger_level = Signal(float)
     trigger_armed_single = Signal()
     trigger_armed_normal = Signal()
@@ -778,6 +784,7 @@ class GUIWorker(QRunnable, ):
                     self.app.model.time_scale = board_dt_per_division
                     self.app.model.visual_time_scale = dt_per_division
                     self.msg_out.correct_trigger_position.emit(self.app.model.trigger.position_live)
+                    self.msg_out.replot_last_waveforms.emit()
                     rearm_if_required()
 
                 case WorkerMessage.SetVoltagePerDiv(channel, dV, update_visual_controls):

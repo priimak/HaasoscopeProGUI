@@ -1,5 +1,4 @@
 import time
-from functools import cache
 from typing import Optional
 
 from PySide6.QtCore import QPointF, Signal
@@ -9,7 +8,6 @@ from hspro_api import Waveform
 from pyqtgraph import AxisItem, GraphicsLayoutWidget, InfiniteLine, PlotDataItem, TextItem
 from pyqtgraph.graphicsItems.PlotItem import PlotItem
 from pyqtgraph.graphicsItems.ViewBox import ViewBox
-from unlib import Duration
 
 from hspro.gui.app import App, WorkerMessage
 from hspro.gui.gui_ext.arrows import XArrowDown, XArrowLeft, XArrowRight
@@ -319,8 +317,10 @@ class PlotsPanel(GraphicsLayoutWidget):
 
         self.app.plot_waveforms = self.plot_waveforms
         self.last_plotted_at = time.time()
+        self.last_plotted_waveforms = []
 
         self.app.select_channel_in_plot = self.select_channel
+        self.app.replot_waveforms = self.replot_last_plotted_waveforms
 
     def on_mouse_moved(self, evt: QPointF):
         pos = evt
@@ -445,30 +445,26 @@ class PlotsPanel(GraphicsLayoutWidget):
     def set_trigger_lines_color_map(self, color_map: str):
         self.trigger_lines_color_map = color_map
 
-    def plot_waveforms(self, ws: tuple[Optional[Waveform], Optional[Waveform]]):
-        ts = None
+    def replot_last_plotted_waveforms(self):
+        if self.last_plotted_waveforms != []:
+            for i, w in enumerate(self.last_plotted_waveforms):
+                if w is not None:
+                    tts = w.get_t_vec(self.app.model.visual_time_scale.time_unit)
+                    self.traces[i].setData(tts, w.vs)
+
+    def plot_waveforms(self, ws: tuple[Optional[Waveform], Optional[Waveform]], save_waveforms: bool = True):
         for i, w in enumerate(ws):
             if w is not None:
-                ts = self.get_ts(
-                    len_vs=len(w.vs),
-                    t_pos=self.corrected_trigger_position[0],
-                    board_time_scale=self.app.model.time_scale,
-                    visual_time_scale=self.app.model.visual_time_scale
-                )
-                self.traces[i].setData(ts, w.vs)
+                w.apply_trigger_correction(self.corrected_trigger_position[0])
+                self.traces[i].setData(w.get_t_vec(self.app.model.visual_time_scale.time_unit), w.vs)
 
         plotted_at = time.time()
         f = int(1 / (plotted_at - self.last_plotted_at))
         self.app.set_live_info_label(f"fps: {f}")
         self.last_plotted_at = plotted_at
 
-    @cache
-    def get_ts(
-            self, len_vs: int, t_pos: float, board_time_scale: Duration, visual_time_scale: Duration
-    ) -> list[float]:
-        trigger_index = int(t_pos * len_vs)
-        board_time_scale_value = board_time_scale.to_float(visual_time_scale.time_unit)
-        return [10 * board_time_scale_value * (i - trigger_index) / len_vs for i in range(len_vs)]
+        if save_waveforms:
+            self.last_plotted_waveforms = list(ws)
 
     def resizeEvent(self, ev):
         super().resizeEvent(ev)
