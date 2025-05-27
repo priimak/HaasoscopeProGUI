@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import QToolBar, QLabel
 from pytide6 import PushButton
 
-from hspro.gui.app import App
+from hspro.gui.app import App, WorkerMessage
 
 
 class MainToolBar(QToolBar):
@@ -50,5 +50,32 @@ class MainToolBar(QToolBar):
 
         take_snapshot_button = PushButton("Take scene snapshot", self)
         take_snapshot_button.clicked.connect(app.record_state_in_scene)
-        self.buttons.append(take_snapshot_button)
         self.addWidget(take_snapshot_button)
+
+        hold_release_button = PushButton("Hold", self)
+        hide_held_button = PushButton("Hide", self)
+        hide_held_button.setEnabled(False)
+
+        def toggle_hold_release():
+            if hold_release_button.text() == "Hold":
+                hold_release_button.setText("Release")
+                app.worker.messages.put(WorkerMessage.HoldWaveforms())
+                hide_held_button.setEnabled(True)
+            else:
+                hold_release_button.setText("Hold")
+                app.worker.messages.put(WorkerMessage.ReleaseWaveforms())
+                hide_held_button.setEnabled(False)
+
+        hold_release_button.clicked.connect(toggle_hold_release)
+        self.addWidget(hold_release_button)
+
+        def toggle_hide_held():
+            if hide_held_button.text() == "Hide":
+                app.worker.messages.put(WorkerMessage.ShowHideHeldWaveforms(False))
+                hide_held_button.setText("Show")
+            else:
+                app.worker.messages.put(WorkerMessage.ShowHideHeldWaveforms(True))
+                hide_held_button.setText("Hide")
+
+        hide_held_button.clicked.connect(toggle_hide_held)
+        self.addWidget(hide_held_button)

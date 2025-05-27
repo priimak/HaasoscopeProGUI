@@ -11,6 +11,7 @@ from pyqtgraph.graphicsItems.ViewBox import ViewBox
 
 from hspro.gui.app import App, WorkerMessage
 from hspro.gui.gui_ext.arrows import XArrowDown, XArrowLeft, XArrowRight
+from hspro.gui.waveform_ext import WaveformExt
 
 
 class TriggerPositionLine(InfiniteLine):
@@ -241,11 +242,19 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.blue_pen.setColor("#0000C8")
 
         self.traces = [PlotDataItem(), PlotDataItem()]
+        self.held_traces = [PlotDataItem(), PlotDataItem()]
+
         # self.zero_markers = [ArrowItem(pos=(1, 1), angle=0, headLen=15, headWidth=10)]
+
         for i, trace in enumerate(self.traces):
             trace.setPen(self.pens[i])
             trace.setVisible(self.app.model.channel[i].active)
             self.plot.addItem(trace)
+
+        for held_trace in self.held_traces:
+            held_trace.setPen(self.mkPen("orange"))
+            held_trace.setVisible(False)
+            self.plot.addItem(held_trace)
 
         # for i, zm in enumerate(self.zero_markers):
         #     zm.setPen(self.pens[i])
@@ -318,9 +327,12 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.app.plot_waveforms = self.plot_waveforms
         self.last_plotted_at = time.time()
         self.last_plotted_waveforms = []
+        self.held_waveforms = []
 
         self.app.select_channel_in_plot = self.select_channel
         self.app.replot_waveforms = self.replot_last_plotted_waveforms
+        self.app.plot_held_waveforms = self.plot_held_waveforms
+        self.app.show_held_waveforms = self.show_held_waveforms
 
     def on_mouse_moved(self, evt: QPointF):
         pos = evt
@@ -449,8 +461,13 @@ class PlotsPanel(GraphicsLayoutWidget):
         if self.last_plotted_waveforms != []:
             for i, w in enumerate(self.last_plotted_waveforms):
                 if w is not None:
-                    tts = w.get_t_vec(self.app.model.visual_time_scale.time_unit)
-                    self.traces[i].setData(tts, w.vs)
+                    self.traces[i].setData(w.get_t_vec(self.app.model.visual_time_scale.time_unit), w.vs)
+        if self.held_waveforms != []:
+            for i, w in enumerate(self.held_waveforms):
+                if w is not None:
+                    self.held_traces[i].setData(
+                        w.waveform.get_t_vec(self.app.model.visual_time_scale.time_unit), w.waveform.vs
+                    )
 
     def plot_waveforms(self, ws: tuple[Optional[Waveform], Optional[Waveform]], save_waveforms: bool = True):
         for i, w in enumerate(ws):
@@ -465,6 +482,24 @@ class PlotsPanel(GraphicsLayoutWidget):
 
         if save_waveforms:
             self.last_plotted_waveforms = list(ws)
+
+    def plot_held_waveforms(self, ws: list[Optional[WaveformExt]]):
+        self.held_waveforms = ws
+        for i, w in enumerate(ws):
+            if w is None:
+                self.held_traces[i].setData()
+                self.held_traces[i].setVisible(False)
+            else:
+                self.held_traces[i].setData(
+                    w.waveform.get_t_vec(self.app.model.visual_time_scale.time_unit), w.waveform.vs
+                )
+                self.held_traces[i].setPen(self.mkPen(w.color))
+                self.held_traces[i].setVisible(True)
+
+    def show_held_waveforms(self, show: bool):
+        for held_trace in self.held_traces:
+            if held_trace._dataset is not None:
+                held_trace.setVisible(show)
 
     def resizeEvent(self, ev):
         super().resizeEvent(ev)

@@ -17,6 +17,7 @@ from unlib import Duration
 
 from hspro.gui.model import BoardModel, ChannelCouplingModel, ChannelImpedanceModel
 from hspro.gui.scene import Scene, SceneCheckpoint, ChannelData
+from hspro.gui.waveform_ext import WaveformExt
 
 
 class App:
@@ -61,6 +62,8 @@ class App:
     update_channel_impedance: Callable[[int, ChannelImpedanceModel], None] = lambda a, b: None
     update_channel_10x: Callable[[int, bool], None] = lambda a, b: None
     plot_waveforms: Callable[[tuple[Optional[Waveform], Optional[Waveform]]], None] = lambda _: None
+    plot_held_waveforms: Callable[[list[Optional[Waveform]]], None] = lambda _: None
+    show_held_waveforms: Callable[[bool], None] = lambda _: None
     update_y_axis_ticks: Callable[[int | None], None] = lambda _: None
     set_grid_opacity: Callable[[float], None] = lambda _: None
     set_trigger_on_channel: Callable[[int], None] = lambda _: None
@@ -85,7 +88,7 @@ class App:
     def __init__(self):
         self.update_trigger_on_channel_label: Callable[[int], None] = lambda _: None
 
-        self.scene = Scene("default", version=1, data=[])  # default scene
+        self.scene = Scene("N/A", version=1, data=[])  # default scene
         self.scene_file: Path | None = None
 
         self.board_thread_pool = QThreadPool()
@@ -97,6 +100,8 @@ class App:
         self.worker.msg_out.trigger_armed_auto.connect(self.do_trigger_armed_auto, conn_type)
         self.worker.msg_out.trigger_armed_forced_acq.connect(self.do_trigger_armed_forced_acq)
         self.worker.msg_out.plot_waveforms.connect(self.do_plot_waveforms, conn_type)
+        self.worker.msg_out.plot_held_waveforms.connect(self.do_plot_held_waveforms, conn_type)
+        self.worker.msg_out.show_held_waveforms.connect(self.do_show_held_waveforms, conn_type)
         self.worker.msg_out.update_y_ticks.connect(self.do_update_y_axis_ticks, conn_type)
         self.worker.msg_out.correct_trigger_position.connect(self.do_correct_trigger_position, conn_type)
         self.worker.msg_out.replot_last_waveforms.connect(self.do_replot_waveforms, conn_type)
@@ -276,6 +281,12 @@ class App:
     def do_plot_waveforms(self, ws: tuple[Optional[Waveform], Optional[Waveform]]):
         self.plot_waveforms(ws)
 
+    def do_plot_held_waveforms(self, ws: list[WaveformExt | None]):
+        self.plot_held_waveforms(ws)
+
+    def do_show_held_waveforms(self, show: bool):
+        self.show_held_waveforms(show)
+
     def do_update_y_axis_ticks(self, channel: int) -> None:
         self.update_y_axis_ticks(channel)
 
@@ -354,6 +365,12 @@ class WorkerMessage:
     class ArmForceAcq:
         pass
 
+    class ShowHideHeldWaveforms:
+        __match_args__ = ("show",)
+
+        def __init__(self, show: bool):
+            self.show = show
+
     class PlotAndRearmNormal:
         __match_args__ = ("notify_gui",)
 
@@ -389,6 +406,12 @@ class WorkerMessage:
 
         def __init__(self, checkpoint_num: int):
             self.checkpoint_num = checkpoint_num - 1
+
+    class HoldWaveforms:
+        pass
+
+    class ReleaseWaveforms:
+        pass
 
     class PlotAndDisarm:
         pass
@@ -518,6 +541,8 @@ class WorkerMessage:
 class MessagesFromGUIWorker(QObject):
     disarm_trigger = Signal()
     plot_waveforms = Signal(tuple)
+    plot_held_waveforms = Signal(list)
+    show_held_waveforms = Signal(bool)
     correct_trigger_position = Signal(float)
     replot_last_waveforms = Signal()
     correct_trigger_level = Signal(float)
@@ -706,7 +731,22 @@ class GUIWorker(QRunnable, ):
                 case WorkerMessage.PlotFromCheckpoint(checkpoint_num):
                     self.app.model.checkpoint = self.app.scene.data[checkpoint_num]
                     w1, w2 = self.app.model.get_checkpoint_waveforms()
+                    self.app.model.cache_waveforms((w1, w2))
                     self.msg_out.plot_waveforms.emit((w1, w2))
+
+                case WorkerMessage.HoldWaveforms():
+                    waveforms = self.app.model.get_waveforms(use_last_shown_waveform=True)
+                    held_waveforms = [
+                        (None if w is None else WaveformExt(w, self.app.model.channel[ch].color))
+                        for ch, w in enumerate(waveforms)
+                    ]
+                    self.msg_out.plot_held_waveforms.emit(held_waveforms)
+
+                case WorkerMessage.ReleaseWaveforms():
+                    self.msg_out.plot_held_waveforms.emit([None, None])
+
+                case WorkerMessage.ShowHideHeldWaveforms(show):
+                    self.msg_out.show_held_waveforms.emit(show)
 
                 case WorkerMessage.PlotAndDisarm():
                     if is_armed:

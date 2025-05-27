@@ -698,6 +698,9 @@ class BoardModel(ModelBase):
             self.cached_waveforms = self.__get_waveforms()
         return self.cached_waveforms
 
+    def cache_waveforms(self, waveforms: tuple[Optional[Waveform], Optional[Waveform]]):
+        self.cached_waveforms = waveforms
+
     def __get_waveforms(self) -> tuple[Optional[Waveform], Optional[Waveform]]:
         if self.board is None:
             return self.channel[0].get_demo_waveform(), self.channel[0].get_demo_waveform()
