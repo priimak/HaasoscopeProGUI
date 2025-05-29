@@ -8,20 +8,20 @@ from unlib import MetricValue, Scale
 
 from hspro.gui.app import App, WorkerMessage
 from hspro.gui.buttons import ZeroButton
-from hspro.gui.gui_ext.spin_boxes import HSProDoubleSpinBox
+from hspro.gui.gui_ext.spin_boxes import HSProSpinBox
 from hspro.gui.model import ChannelCouplingModel, ChannelImpedanceModel
 from hspro.gui.scene import SceneCheckpoint
 
 
-class VperDivSpinner(HSProDoubleSpinBox):
+class VperDivSpinner(HSProSpinBox):
     def __init__(self, channel: int, app: App):
-        super().__init__()
+        super().__init__(app)
         self.channel = channel
         self.app = app
         self.setMinimum(0)
         self.setDecimals(0)
         self.setMaximum(1000)
-        self.setMaximumWidth(200)
+        self.setMaximumWidth(170)
         self.voltage_per_division = MetricValue.value_of(f"{app.model.channel[channel].dV} V").optimize()
         self.setValue(self.voltage_per_division.value)
         self.setSuffix(f" {self.voltage_per_division.scale.to_str()}V/div")
@@ -53,15 +53,15 @@ class VperDivSpinner(HSProDoubleSpinBox):
         )
 
 
-class VoltageOffsetSpinner(HSProDoubleSpinBox):
+class VoltageOffsetSpinner(HSProSpinBox):
     def __init__(self, channel: int, app: App):
-        super().__init__()
+        super().__init__(app)
         self.channel = channel
         self.app = app
         self.setMinimum(-1_000_000_000)
         self.setMaximum(1_000_000_000)
         self.setDecimals(2)
-        self.setMaximumWidth(120)
+        self.setMaximumWidth(150)
         self.offset = MetricValue.value_of(f"{app.model.channel[channel].offset_V} V").optimize()
         self.setValue(self.offset.value)
         self.setSuffix(f" {self.offset.scale.to_str()}V")

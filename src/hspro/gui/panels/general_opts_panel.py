@@ -3,12 +3,12 @@ from PySide6.QtWidgets import QLabel
 from pytide6 import VBoxPanel, HBoxPanel, W
 
 from hspro.gui.app import App, WorkerMessage
-from hspro.gui.gui_ext.spin_boxes import HSProDoubleSpinBox
+from hspro.gui.gui_ext.spin_boxes import HSProSpinBox
 
 
-class TimeScaleSpinner(HSProDoubleSpinBox):
+class TimeScaleSpinner(HSProSpinBox):
     def __init__(self, app: App):
-        super().__init__()
+        super().__init__(app)
         self.app = app
         self.setMinimum(0)
         self.setMaximum(1_000_000_000_000.0)

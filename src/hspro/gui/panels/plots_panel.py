@@ -237,10 +237,6 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.black_pen.setCosmetic(True)
         self.black_pen.setColor("#000000")
 
-        self.blue_pen = QPen()
-        self.blue_pen.setCosmetic(True)
-        self.blue_pen.setColor("#0000C8")
-
         self.traces = [PlotDataItem(), PlotDataItem()]
         self.held_traces = [PlotDataItem(), PlotDataItem()]
 
