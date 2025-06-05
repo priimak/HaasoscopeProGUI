@@ -24,7 +24,7 @@ class HSProMainWindow(MainWindow):
 
         self.setStyleSheet("QMainWindow { background-color: #000000; }")
 
-        self.app = App()
+        self.app = App(screen_dim)
         self.app.model = BoardModel(app_persistence)
         self.app.app_persistence = app_persistence
         self.app.main_window = lambda: self

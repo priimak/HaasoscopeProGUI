@@ -17,12 +17,17 @@ class MainToolBar(QToolBar):
 
         def mk_selector(b: PushButton):
             def select():
-                for btn in self.buttons:
-                    if btn is b:
-                        btn.setStyleSheet("background-color: #008800; color: white;")
-                        app.current_active_tool = b.text()
-                    else:
-                        btn.setStyleSheet("background-color: #ffffff; color: black;")
+                if app.current_active_tool == b.text():
+                    # deactivate this tool
+                    app.current_active_tool = None
+                    b.setStyleSheet("background-color: #ffffff; color: black;")
+                else:
+                    for btn in self.buttons:
+                        if btn is b:
+                            btn.setStyleSheet("background-color: #008800; color: white;")
+                            app.current_active_tool = b.text()
+                        else:
+                            btn.setStyleSheet("background-color: #ffffff; color: black;")
 
             return select
 

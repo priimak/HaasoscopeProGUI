@@ -18,6 +18,7 @@ from unlib import Duration
 from hspro.gui.model import BoardModel, ChannelCouplingModel, ChannelImpedanceModel
 from hspro.gui.scene import Scene, SceneCheckpoint, ChannelData
 from hspro.gui.waveform_ext import WaveformExt
+from hspro.gui.zoom_dialog import ZoomDialog
 
 
 class App:
@@ -67,6 +68,7 @@ class App:
     update_y_axis_ticks: Callable[[int | None], None] = lambda _: None
     set_grid_opacity: Callable[[float], None] = lambda _: None
     set_trigger_on_channel: Callable[[int], None] = lambda _: None
+    hide_zoom_box: Callable[[], None] = lambda: None
 
     set_trigger_lines_width: Callable[[int], None] = lambda _: None
     update_trigger_lines_color: Callable[[int], None] = lambda _: None
@@ -85,11 +87,16 @@ class App:
     selected_channel: int | None = None
     current_active_tool = ""
 
-    def __init__(self):
+    def __init__(self, screen_dim: tuple[int, int]):
+        self.last_plotted_waveforms = []
+        self.screen_dim: tuple[int, int] = screen_dim
+
         self.update_trigger_on_channel_label: Callable[[int], None] = lambda _: None
 
         self.scene = Scene("N/A", version=1, data=[])  # default scene
         self.scene_file: Path | None = None
+
+        self.zoom_dialog: ZoomDialog | None = None
 
         self.board_thread_pool = QThreadPool()
         self.worker = GUIWorker(self)
@@ -127,6 +134,18 @@ class App:
                 self.scene_file.write_text(json.dumps(dataclasses.asdict(self.scene), indent=2))
                 self.do_update_scene_data(self.scene)
                 break
+
+    def open_or_update_zoom_dialog(self):
+        if self.zoom_dialog is None:
+            def unregister():
+                self.zoom_dialog = None
+                self.hide_zoom_box()
+
+            self.zoom_dialog = ZoomDialog(self.main_window(), app=self, on_close=unregister)
+            self.zoom_dialog.show()
+        else:
+            # TODO: update opened zoom dialog
+            pass
 
     def get_scene(self) -> Scene:
         return self.scene
@@ -955,4 +974,6 @@ class GUIWorker(QRunnable, ):
                 case WorkerMessage.Quit():
                     self.app.model.cleanup()
                     self.messages.shutdown(True)
+                    if self.app.zoom_dialog is not None:
+                        self.app.zoom_dialog.close()
                     break

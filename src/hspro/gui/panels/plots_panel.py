@@ -3,13 +3,15 @@ from typing import Optional
 
 from PySide6.QtCore import QPointF, Signal
 from PySide6.QtGui import QPen, Qt, QFontDatabase, QColor, QBrush
-# from PySide6.QtWidgets import QGraphicsSceneMouseEvent
+from PySide6.QtWidgets import QGraphicsSceneMouseEvent
 from hspro_api import Waveform
-from pyqtgraph import AxisItem, GraphicsLayoutWidget, InfiniteLine, PlotDataItem, TextItem
+from pyqtgraph import AxisItem, GraphicsLayoutWidget, InfiniteLine, PlotDataItem, TextItem, mkPen, mkBrush
+from pyqtgraph.Qt import QtWidgets
 from pyqtgraph.graphicsItems.PlotItem import PlotItem
 from pyqtgraph.graphicsItems.ViewBox import ViewBox
 
 from hspro.gui.app import App, WorkerMessage
+from hspro.gui.gui_ext import fn
 from hspro.gui.gui_ext.arrows import XArrowDown, XArrowLeft, XArrowRight
 from hspro.gui.waveform_ext import WaveformExt
 
@@ -27,7 +29,7 @@ class PlotsPanel(GraphicsLayoutWidget):
     def __init__(self, parent, app: App):
         super().__init__(parent)
         self.app = app
-        self.pens = [self.mkPen(ch.color) for ch in self.app.model.channel]
+        self.pens = [fn.mkPen(ch.color) for ch in self.app.model.channel]
         self.brushes = [QBrush(ch.color) for ch in self.app.model.channel]
         self.do_show_trig_level_line = self.app.app_persistence.config.get_by_xpath("/show_trigger_level_line", bool)
         self.do_show_trig_pos_line = self.app.app_persistence.config.get_by_xpath("/show_trigger_position_line", bool)
@@ -145,22 +147,39 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.vbox.setMouseEnabled(False, False)
         self.vbox.setRange(xRange=(0, 10), yRange=(-5, 5), padding=0)
 
-        #        self.vbox.mousePressEvent = self.mouseAction
+        zoomBox = QtWidgets.QGraphicsRectItem(0, 0, 10, 10)
+        zoomBox.setPen(mkPen((255, 255, 100), width=1))
+        zoomBox.setBrush(mkBrush(255, 255, 0, 100))
+        zoomBox.setZValue(1e9)
+        zoomBox.hide()
+        self.app.hide_zoom_box = zoomBox.hide
+        self.vbox.scene().addItem(zoomBox)
 
-        # self.originalMousePressEvent = self.vbox.mousePressEvent
-        # self.zoomStartingPoint = []
-        # def zoom_start(e: QGraphicsSceneMouseEvent):
-        #     self.zoomStartingPoint.clear()
-        #     self.zoomStartingPoint.append(e.pos())
-        #     # print(self.zoomStartingPoint[0])
-        # self.vbox.setMouseMode(ViewBox.RectMode)
-        # # self.vbox.mousePressEvent = zoom_start
-        #
-        # def md(ev, ax=None):
-        #     print(ev)
-        #
-        #     pyqtgraph.ViewBox.mouseDragEvent(self.vbox, ev, axis=ax)
-        # self.vbox.mouseDragEvent = md
+        def mouse_press_event(e: QGraphicsSceneMouseEvent):
+            if app.current_active_tool == "Zoom":
+                pos = e.scenePos()
+                zoomBox.setRect(pos.x(), pos.y(), 1, 1)
+                zoomBox.show()
+
+        def mouse_release_event(e: QGraphicsSceneMouseEvent):
+            if app.current_active_tool == "Zoom":
+                self.app.open_or_update_zoom_dialog()
+
+        def mouse_move_event(e):
+            if app.current_active_tool == "Zoom":
+                pos = e.scenePos()
+                rect = zoomBox.rect()
+                x = rect.x()
+                y = rect.y()
+                dx = pos.x() - x
+                dy = pos.y() - y
+                if dx < 0 or dy < 0:
+                    zoomBox.hide()
+                zoomBox.setRect(x, y, dx, dy)
+
+        self.vbox.mousePressEvent = mouse_press_event
+        self.vbox.mouseReleaseEvent = mouse_release_event
+        self.vbox.mouseMoveEvent = mouse_move_event
 
         # self.zero_h_line = InfiniteLine(pos=0, movable=False, angle=0, pen=(0, 0, 200), span=(0, 1))
         # self.plot.addItem(self.zero_h_line)
@@ -248,7 +267,7 @@ class PlotsPanel(GraphicsLayoutWidget):
             self.plot.addItem(trace)
 
         for held_trace in self.held_traces:
-            held_trace.setPen(self.mkPen("orange"))
+            held_trace.setPen(fn.mkPen("orange"))
             held_trace.setVisible(False)
             self.plot.addItem(held_trace)
 
@@ -322,7 +341,7 @@ class PlotsPanel(GraphicsLayoutWidget):
 
         self.app.plot_waveforms = self.plot_waveforms
         self.last_plotted_at = time.time()
-        self.last_plotted_waveforms = []
+        self.app.last_plotted_waveforms = []
         self.held_waveforms = []
 
         self.app.select_channel_in_plot = self.select_channel
@@ -377,13 +396,6 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.app.set_trigger_pos_from_plot_line(new_trigger_position)
         self.app.worker.messages.put(WorkerMessage.SetTriggerPosition(new_trigger_position))
         self.trigger_pos_line.setX(0)
-
-    def mkPen(self, color: str) -> QPen:
-        pen = QPen()
-        pen.setCosmetic(True)
-        pen.setWidth(2)
-        pen.setColor(color)
-        return pen
 
     def channel_active_state_changed(self, channel: int, active: bool):
         self.traces[channel].setVisible(active)
@@ -454,8 +466,8 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.trigger_lines_color_map = color_map
 
     def replot_last_plotted_waveforms(self):
-        if self.last_plotted_waveforms != []:
-            for i, w in enumerate(self.last_plotted_waveforms):
+        if self.app.last_plotted_waveforms != []:
+            for i, w in enumerate(self.app.last_plotted_waveforms):
                 if w is not None:
                     self.traces[i].setData(w.get_t_vec(self.app.model.visual_time_scale.time_unit), w.vs)
         if self.held_waveforms != []:
@@ -477,7 +489,7 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.last_plotted_at = plotted_at
 
         if save_waveforms:
-            self.last_plotted_waveforms = list(ws)
+            self.app.last_plotted_waveforms = list(ws)
 
     def plot_held_waveforms(self, ws: list[Optional[WaveformExt]]):
         self.held_waveforms = ws
@@ -489,7 +501,7 @@ class PlotsPanel(GraphicsLayoutWidget):
                 self.held_traces[i].setData(
                     w.waveform.get_t_vec(self.app.model.visual_time_scale.time_unit), w.waveform.vs
                 )
-                self.held_traces[i].setPen(self.mkPen(w.color))
+                self.held_traces[i].setPen(fn.mkPen(w.color))
                 self.held_traces[i].setVisible(True)
 
     def show_held_waveforms(self, show: bool):
@@ -523,6 +535,3 @@ class PlotsPanel(GraphicsLayoutWidget):
             )
 
             self.zero_marker.setX(self.plot.getViewBox().x() + 8)
-
-    # def mouseAction(self, ev: QGraphicsSceneMouseEvent):
-    #     print(self.app.current_active_tool)
