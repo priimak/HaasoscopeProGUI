@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import QScrollArea, QMessageBox, QProgressDialog, QProgressBar
 from hspro_api.board import mk_board
@@ -18,17 +18,21 @@ from hspro.gui.toolbar import MainToolBar
 
 
 class HSProMainWindow(MainWindow):
+    request_exit = Signal()
 
-    def __init__(self, screen_dim: tuple[int, int], app_persistence: AppPersistence):
+    def __init__(self, screen_dim: tuple[int, int], app_persistence: AppPersistence, app: App):
         super().__init__(objectName="MainWindow", windowTitle="Haasoscope Pro GUI")
+
+        self.request_exit.connect(self.close)
+        self.close_event_msg_out = True
 
         self.setStyleSheet("QMainWindow { background-color: #000000; }")
 
-        self.app = App(screen_dim)
+        self.app = app
         self.app.model = BoardModel(app_persistence)
         self.app.app_persistence = app_persistence
         self.app.main_window = lambda: self
-        self.app.exit_application = self.close
+        self.app.exit_application = lambda: self.app.worker.messages.put(WorkerMessage.Quit())
 
         set_geometry(app_state=app_persistence.state, widget=self, screen_dim=screen_dim, win_size_fraction=0.7)
 
@@ -101,6 +105,9 @@ class HSProMainWindow(MainWindow):
                 self.setStyleSheet("QMainWindow { background-color: #000000; }")
                 self.channels_area.setStyleSheet("QScrollArea { background-color: #000000; }")
 
+        if self.app.zoom_dialog is not None:
+            self.app.zoom_dialog.set_plot_color_scheme(color_scheme)
+
         self.channels_panel.set_color_scheme(color_scheme)
         match color_scheme:
             case "light":
@@ -116,8 +123,14 @@ class HSProMainWindow(MainWindow):
                 self.right_panel.setPalette(palette)
 
     def closeEvent(self, event):
-        self.app.worker.messages.put(WorkerMessage.Quit())
-        super().closeEvent(event)
+        if self.app.zoom_dialog is not None:
+            self.app.zoom_dialog.close()
+        if self.close_event_msg_out:
+            self.app.worker.messages.put(WorkerMessage.Quit())
+            event.ignore()
+        else:
+            event.accept()
+            exit(1)
 
     def connect_to_board(self):
         from hspro.gui.board_selector_dialog import BoardSelectorDialog
@@ -128,7 +141,7 @@ class HSProMainWindow(MainWindow):
         if num_connections == 0:
             res = QMessageBox.question(None, "Start in demo mode?", "No HaasoscopePro found. Start in \"demo\" mode?")
             if res != QMessageBox.StandardButton.Yes:
-                self.exit_app()
+                self.app.worker.messages.put(WorkerMessage.Quit())
 
         elif num_connections == 1:
             self.connect_to_selected_board(connections[0])
@@ -138,7 +151,7 @@ class HSProMainWindow(MainWindow):
             board_selector_dialog = BoardSelectorDialog(self, connections)
             board_selector_dialog.exec_()
             if board_selector_dialog.selected_connection is None:
-                self.exit_app()
+                self.app.worker.messages.put(WorkerMessage.Quit())
             else:
                 self.connect_to_selected_board(board_selector_dialog.selected_connection)
 
@@ -156,7 +169,7 @@ class HSProMainWindow(MainWindow):
 
         def close_app():
             if progress.wasCanceled():
-                self.exit_app()
+                self.app.worker.messages.put(WorkerMessage.Quit())
 
         progress.canceled.connect(close_app)
 
@@ -170,6 +183,6 @@ class HSProMainWindow(MainWindow):
         progress.wasCanceled = lambda: False
         progress.close()
 
-    def exit_app(self):
-        self.app.worker.messages.put(WorkerMessage.Quit())
-        exit(1)
+    def close(self, /):
+        self.close_event_msg_out = False
+        return super().close()

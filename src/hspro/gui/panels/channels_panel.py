@@ -163,6 +163,7 @@ class ChannelsPanel(VBoxPanel):
                             color_selector.color = new_color
                             app.model.channel[channel].color = new_color
                             app.set_channel_color(channel, new_color, True)
+                            app.set_channel_color_in_zoom_window(channel, new_color, True)
                             app.update_trigger_lines_color(app.model.trigger.on_channel)
 
                 return select_color
@@ -265,6 +266,7 @@ class ChannelsPanel(VBoxPanel):
                 )
                 app.model.channel[channel].color = cdata.color
                 app.set_channel_color(channel, cdata.color, False)
+                app.set_channel_color_in_zoom_window(channel, cdata.color, False)
 
                 self.app.worker.messages.put(
                     WorkerMessage.SetChannel10x(channel, cdata.ten_x_probe, update_visual_controls=True)

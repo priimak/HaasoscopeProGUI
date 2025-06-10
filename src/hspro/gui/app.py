@@ -4,10 +4,10 @@ import time
 from enum import Enum, auto
 from functools import cache
 from pathlib import Path
-from queue import Queue
+from queue import Queue, ShutDown
 from typing import Callable, Optional
 
-from PySide6.QtCore import QThreadPool, QRunnable, Signal, QObject
+from PySide6.QtCore import QThreadPool, QRunnable, Signal, QObject, QRectF
 from PySide6.QtGui import QPalette, QPen, Qt
 from PySide6.QtWidgets import QMessageBox, QFileDialog
 from hspro_api import TriggerType, WaveformAvailable, Waveform
@@ -41,6 +41,7 @@ class App:
     deselect_channel: Callable[[int], None] = lambda _: None
     remove_all_y_axis_ticks_labels: Callable[[], None] = lambda: None
     set_channel_color: Callable[[int, str, bool], None] = lambda a, b, c: None
+    set_channel_color_in_zoom_window: Callable[[int, str, bool], None] = lambda a, b, c: None
     set_show_grid_state: Callable[[bool], None] = lambda _: None
     set_show_y_axis_labels: Callable[[bool], None] = lambda _: None
     set_show_zero_line: Callable[[bool], None] = lambda _: None
@@ -78,6 +79,8 @@ class App:
     apply_checkpoint_to_trigger_panel: Callable[[SceneCheckpoint], None] = lambda _: None
     apply_checkpoint_to_channels_panel: Callable[[SceneCheckpoint], None] = lambda _: None
 
+    update_zoom_rect_on_main_plot: Callable[[QRectF], None] = lambda _: None
+
     board_thread_pool: QThreadPool
     worker: "GUIWorker"
 
@@ -88,10 +91,11 @@ class App:
     current_active_tool = ""
 
     def __init__(self, screen_dim: tuple[int, int]):
-        self.last_plotted_waveforms = []
+        self.last_plotted_waveforms: list[Waveform] = []
         self.screen_dim: tuple[int, int] = screen_dim
 
         self.update_trigger_on_channel_label: Callable[[int], None] = lambda _: None
+        self.waveforms_updated: Callable[[], None] = lambda: None
 
         self.scene = Scene("N/A", version=1, data=[])  # default scene
         self.scene_file: Path | None = None
@@ -119,7 +123,14 @@ class App:
         self.worker.msg_out.update_channel_impedance.connect(self.do_update_channel_impedance, conn_type)
         self.worker.msg_out.update_channel_10x.connect(self.do_update_channel_10x, conn_type)
         self.worker.msg_out.apply_checkpoint.connect(self.apply_checkpoint, conn_type)
+        self.worker.msg_out.notify_waveforms_updated.connect(self.do_waveforms_updated,
+                                                             Qt.ConnectionType.QueuedConnection)
         self.board_thread_pool.start(self.worker)
+
+    def record_last_plotted_waveforms(self, waveforms: list[Waveform]):
+        self.last_plotted_waveforms.clear()
+        self.last_plotted_waveforms.extend(waveforms)
+        self.worker.msg_out.notify_waveforms_updated.emit()
 
     def create_new_scene(self):
         while True:
@@ -135,17 +146,18 @@ class App:
                 self.do_update_scene_data(self.scene)
                 break
 
-    def open_or_update_zoom_dialog(self):
+    def open_or_update_zoom_dialog(self, view_bounds: QRectF):
         if self.zoom_dialog is None:
             def unregister():
                 self.zoom_dialog = None
                 self.hide_zoom_box()
 
             self.zoom_dialog = ZoomDialog(self.main_window(), app=self, on_close=unregister)
+            self.zoom_dialog.update_zoom_bounds(view_bounds)
+            self.zoom_dialog.set_plot_color_scheme(self.plot_color_scheme)
             self.zoom_dialog.show()
         else:
-            # TODO: update opened zoom dialog
-            pass
+            self.zoom_dialog.update_zoom_bounds(view_bounds)
 
     def get_scene(self) -> Scene:
         return self.scene
@@ -278,9 +290,15 @@ class App:
     def save_scene(self):
         self.scene_file.write_text(json.dumps(dataclasses.asdict(self.scene), indent=2))
 
+    def do_update_zoom_rect_on_main_plot(self, rect: QRectF):
+        self.update_zoom_rect_on_main_plot(rect)
+
     def do_update_scene_data(self, scene: Scene):
         self.update_scene_data(scene)
         self.update_scene_history_dialog(scene)
+
+    def do_waveforms_updated(self):
+        self.waveforms_updated()
 
     def do_disarm_trigger(self):
         self.trigger_disarmed()
@@ -553,6 +571,12 @@ class WorkerMessage:
         def __init__(self, f_delay: int):
             self.f_delay = f_delay
 
+    class UpdateZoomRect:
+        __match_args__ = ("rect",)
+
+        def __init__(self, rect: QRectF):
+            self.rect = rect
+
     class Quit:
         pass
 
@@ -576,6 +600,7 @@ class MessagesFromGUIWorker(QObject):
     update_channel_10x = Signal(int, ChannelImpedanceModel)
     update_y_ticks = Signal(int)
     apply_checkpoint = Signal(SceneCheckpoint)
+    notify_waveforms_updated = Signal()
 
 
 class ArmType(Enum):
@@ -588,6 +613,7 @@ class ArmType(Enum):
 class GUIWorker(QRunnable, ):
     def __init__(self, app: App):
         super().__init__()
+        self.setAutoDelete(True)
         self.messages = Queue()
         self.app = app
         self.msg_out = MessagesFromGUIWorker()
@@ -605,6 +631,15 @@ class GUIWorker(QRunnable, ):
             return False
 
     def run(self):
+        try:
+            self._run()
+        except ShutDown:
+            pass
+        except Exception as ex:
+            QMessageBox.critical(None, "Error", f"Error: {ex}")
+            self.app.main_window().request_exit.emit()
+
+    def _run(self):
         is_armed = False
         self.arm_type = ArmType.DISARMED
         current_trigger_type = TriggerType.DISABLED
@@ -844,6 +879,8 @@ class GUIWorker(QRunnable, ):
                     self.app.model.visual_time_scale = dt_per_division
                     self.msg_out.correct_trigger_position.emit(self.app.model.trigger.position_live)
                     self.msg_out.replot_last_waveforms.emit()
+                    self.app.main_window().glw.update_zoom_box()
+                    self.msg_out.notify_waveforms_updated.emit()
                     rearm_if_required()
 
                 case WorkerMessage.SetVoltagePerDiv(channel, dV, update_visual_controls):
@@ -971,9 +1008,12 @@ class GUIWorker(QRunnable, ):
                     self.app.model.f_delay = f_delay
                     rearm_if_required()
 
+                case WorkerMessage.UpdateZoomRect(rect):
+                    self.app.main_window().glw.zoomBox.setRect(rect)
+
                 case WorkerMessage.Quit():
                     self.app.model.cleanup()
+                    self.drain_queue()
                     self.messages.shutdown(True)
-                    if self.app.zoom_dialog is not None:
-                        self.app.zoom_dialog.close()
+                    self.app.main_window().request_exit.emit()
                     break

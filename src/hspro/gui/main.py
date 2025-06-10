@@ -1,11 +1,13 @@
 import sys
 from pathlib import Path
+from queue import ShutDown
 
 from PySide6.QtCore import QSize
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 from sprats.config import AppPersistence
 
+from hspro.gui.app import App, WorkerMessage
 from hspro.gui.main_window import HSProMainWindow
 from hspro.gui.model import ChannelCouplingModel, ChannelImpedanceModel
 
@@ -71,11 +73,20 @@ def main():
         }
     )
 
-    win = HSProMainWindow(screen_dim=(screen_width, screen_height), app_persistence=persistence)
-    win.show()
-    win.activateWindow()
-    win.raise_()
-    sys.exit(app.exec())
+    application = App((screen_width, screen_height))
+    try:
+        win = HSProMainWindow(screen_dim=(screen_width, screen_height), app_persistence=persistence, app=application)
+        win.show()
+        win.activateWindow()
+        win.raise_()
+        sys.exit(app.exec())
+    except Exception as ex:
+        if not isinstance(ex, ShutDown):
+            QMessageBox.critical(None, "Error", f"Error: {ex}")
+            try:
+                application.worker.messages.put(WorkerMessage.Quit())
+            except:
+                pass
 
 
 if __name__ == '__main__':

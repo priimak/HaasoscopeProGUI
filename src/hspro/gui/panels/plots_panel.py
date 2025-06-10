@@ -1,7 +1,7 @@
 import time
 from typing import Optional
 
-from PySide6.QtCore import QPointF, Signal
+from PySide6.QtCore import QPointF, Signal, QRectF
 from PySide6.QtGui import QPen, Qt, QFontDatabase, QColor, QBrush
 from PySide6.QtWidgets import QGraphicsSceneMouseEvent
 from hspro_api import Waveform
@@ -25,6 +25,7 @@ class TriggerPositionLine(InfiniteLine):
 class PlotsPanel(GraphicsLayoutWidget):
     update_y_ticks_color = Signal(int)
     update_zero_line_position = Signal(float)
+    update_zoom_rect = Signal(QRectF)
 
     def __init__(self, parent, app: App):
         super().__init__(parent)
@@ -147,35 +148,55 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.vbox.setMouseEnabled(False, False)
         self.vbox.setRange(xRange=(0, 10), yRange=(-5, 5), padding=0)
 
-        zoomBox = QtWidgets.QGraphicsRectItem(0, 0, 10, 10)
-        zoomBox.setPen(mkPen((255, 255, 100), width=1))
-        zoomBox.setBrush(mkBrush(255, 255, 0, 100))
-        zoomBox.setZValue(1e9)
-        zoomBox.hide()
-        self.app.hide_zoom_box = zoomBox.hide
-        self.vbox.scene().addItem(zoomBox)
+        self.zoom_crds = [[0, 0], [10, 10]]
+        self.zoomBox = QtWidgets.QGraphicsRectItem(
+            self.zoom_crds[0][0], self.zoom_crds[0][1],
+            self.zoom_crds[1][0], self.zoom_crds[1][1]
+        )
+        self.zoomBox.setPen(mkPen((100, 100, 100), width=1))
+        # self.zoomBox.setPen(mkPen((255, 255, 100), width=1))
+        self.zoomBox.setBrush(mkBrush(255, 255, 0, 100))
+        self.zoomBox.setZValue(1e9)
+        self.zoomBox.hide()
+        self.app.hide_zoom_box = self.zoomBox.hide
+        self.vbox.scene().addItem(self.zoomBox)
+
+        def upd_zoom_box(rect: QRectF):
+            rect = self.vbox.mapViewToScene(rect)
+            self.zoomBox.setRect(QRectF(rect.toList()[0], rect.toList()[2]))
+
+        self.update_zoom_rect.connect(upd_zoom_box)
+
+        self.app.update_zoom_rect_on_main_plot = self.update_zoom_rect_on_main_plot
 
         def mouse_press_event(e: QGraphicsSceneMouseEvent):
             if app.current_active_tool == "Zoom":
                 pos = e.scenePos()
-                zoomBox.setRect(pos.x(), pos.y(), 1, 1)
-                zoomBox.show()
+                self.zoom_crds[0][0] = pos.x()
+                self.zoom_crds[0][1] = pos.y()
+                self.zoomBox.setRect(self.zoom_crds[0][0], self.zoom_crds[0][1], 1, 1)
+                self.zoomBox.show()
 
         def mouse_release_event(e: QGraphicsSceneMouseEvent):
             if app.current_active_tool == "Zoom":
-                self.app.open_or_update_zoom_dialog()
+                rect = self.zoomBox.rect()
+                self.app.open_or_update_zoom_dialog(
+                    QRectF(
+                        self.vbox.mapSceneToView(QPointF(rect.left(), rect.top())),
+                        self.vbox.mapSceneToView(QPointF(rect.right(), rect.bottom()))
+                    )
+                )
 
         def mouse_move_event(e):
             if app.current_active_tool == "Zoom":
                 pos = e.scenePos()
-                rect = zoomBox.rect()
-                x = rect.x()
-                y = rect.y()
-                dx = pos.x() - x
-                dy = pos.y() - y
-                if dx < 0 or dy < 0:
-                    zoomBox.hide()
-                zoomBox.setRect(x, y, dx, dy)
+                self.zoom_crds[1][0] = pos.x()
+                self.zoom_crds[1][1] = pos.y()
+                x0 = self.zoom_crds[0][0] if self.zoom_crds[1][0] >= self.zoom_crds[0][0] else self.zoom_crds[1][0]
+                dx = abs(self.zoom_crds[1][0] - self.zoom_crds[0][0])
+                y0 = self.zoom_crds[0][1] if self.zoom_crds[1][1] >= self.zoom_crds[0][1] else self.zoom_crds[1][1]
+                dy = abs(self.zoom_crds[1][1] - self.zoom_crds[0][1])
+                self.zoomBox.setRect(x0, y0, dx, dy)
 
         self.vbox.mousePressEvent = mouse_press_event
         self.vbox.mouseReleaseEvent = mouse_release_event
@@ -341,13 +362,22 @@ class PlotsPanel(GraphicsLayoutWidget):
 
         self.app.plot_waveforms = self.plot_waveforms
         self.last_plotted_at = time.time()
-        self.app.last_plotted_waveforms = []
         self.held_waveforms = []
 
         self.app.select_channel_in_plot = self.select_channel
         self.app.replot_waveforms = self.replot_last_plotted_waveforms
         self.app.plot_held_waveforms = self.plot_held_waveforms
         self.app.show_held_waveforms = self.show_held_waveforms
+
+    def update_zoom_box(self):
+        if self.app.current_active_tool == "Zoom":
+            rect = self.zoomBox.rect()
+            r2 = QRectF(self.vbox.mapSceneToView(QPointF(rect.left(), rect.top())),
+                        self.vbox.mapSceneToView(QPointF(rect.right(), rect.bottom())))
+            self.app.open_or_update_zoom_dialog(r2)
+
+    def update_zoom_rect_on_main_plot(self, rect: QRectF):
+        self.update_zoom_rect.emit(rect)
 
     def on_mouse_moved(self, evt: QPointF):
         pos = evt
@@ -489,7 +519,7 @@ class PlotsPanel(GraphicsLayoutWidget):
         self.last_plotted_at = plotted_at
 
         if save_waveforms:
-            self.app.last_plotted_waveforms = list(ws)
+            self.app.record_last_plotted_waveforms(list(ws))
 
     def plot_held_waveforms(self, ws: list[Optional[WaveformExt]]):
         self.held_waveforms = ws
