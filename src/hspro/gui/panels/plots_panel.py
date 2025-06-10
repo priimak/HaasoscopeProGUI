@@ -169,6 +169,10 @@ class PlotsPanel(GraphicsLayoutWidget):
 
         self.app.update_zoom_rect_on_main_plot = self.update_zoom_rect_on_main_plot
 
+        original_mousePressEvent = self.vbox.mousePressEvent
+        original_mouseReleaseEvent = self.vbox.mouseReleaseEvent
+        original_mouseMoveEvent = self.vbox.mouseMoveEvent
+
         def mouse_press_event(e: QGraphicsSceneMouseEvent):
             if app.current_active_tool == "Zoom":
                 pos = e.scenePos()
@@ -176,6 +180,8 @@ class PlotsPanel(GraphicsLayoutWidget):
                 self.zoom_crds[0][1] = pos.y()
                 self.zoomBox.setRect(self.zoom_crds[0][0], self.zoom_crds[0][1], 1, 1)
                 self.zoomBox.show()
+            else:
+                original_mousePressEvent(e)
 
         def mouse_release_event(e: QGraphicsSceneMouseEvent):
             if app.current_active_tool == "Zoom":
@@ -186,6 +192,8 @@ class PlotsPanel(GraphicsLayoutWidget):
                         self.vbox.mapSceneToView(QPointF(rect.right(), rect.bottom()))
                     )
                 )
+            else:
+                original_mouseReleaseEvent(e)
 
         def mouse_move_event(e):
             if app.current_active_tool == "Zoom":
@@ -197,6 +205,8 @@ class PlotsPanel(GraphicsLayoutWidget):
                 y0 = self.zoom_crds[0][1] if self.zoom_crds[1][1] >= self.zoom_crds[0][1] else self.zoom_crds[1][1]
                 dy = abs(self.zoom_crds[1][1] - self.zoom_crds[0][1])
                 self.zoomBox.setRect(x0, y0, dx, dy)
+            else:
+                original_mouseMoveEvent(e)
 
         self.vbox.mousePressEvent = mouse_press_event
         self.vbox.mouseReleaseEvent = mouse_release_event
