@@ -41,7 +41,6 @@ class App:
     deselect_channel: Callable[[int], None] = lambda _: None
     remove_all_y_axis_ticks_labels: Callable[[], None] = lambda: None
     set_channel_color: Callable[[int, str, bool], None] = lambda a, b, c: None
-    set_channel_color_in_zoom_window: Callable[[int, str, bool], None] = lambda a, b, c: None
     set_show_grid_state: Callable[[bool], None] = lambda _: None
     set_show_y_axis_labels: Callable[[bool], None] = lambda _: None
     set_show_zero_line: Callable[[bool], None] = lambda _: None
@@ -96,6 +95,7 @@ class App:
 
         self.update_trigger_on_channel_label: Callable[[int], None] = lambda _: None
         self.waveforms_updated: Callable[[], None] = lambda: None
+        self.set_channel_color_in_zoom_window: Callable[[int, str, bool], None] = lambda a, b, c: None
 
         self.scene = Scene("N/A", version=1, data=[])  # default scene
         self.scene_file: Path | None = None

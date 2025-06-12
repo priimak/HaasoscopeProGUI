@@ -158,10 +158,11 @@ class HSProMainWindow(MainWindow):
     def connect_to_selected_board(self, connection: Connection):
         progress = QProgressDialog("Initializing oscilloscope", "Abort", 0, 0, None)
         progress.setWindowTitle("Initializing oscilloscope")
+        progress_bar_max_value = 34
         bar = QProgressBar(progress)
         bar.setTextVisible(False)
         bar.setMaximum(0)
-        bar.setMaximum(10)
+        bar.setMaximum(progress_bar_max_value)
         progress.setBar(bar)
         progress.setMinimumDuration(0)
         progress.setWindowModality(Qt.WindowModality.WindowModal)
@@ -176,7 +177,8 @@ class HSProMainWindow(MainWindow):
         self.app.model.link_to_live_board(
             mk_board(
                 connection, debug=False, debug_spi=False, show_board_call_trace=False,
-                progress_callback=lambda i: progress.setValue(i)
+                progress_callback=lambda i: progress.setValue(i),
+                wrap_progress_counter_at=progress_bar_max_value
             )
         )
         self.app.set_connection_status_label("Connected")
