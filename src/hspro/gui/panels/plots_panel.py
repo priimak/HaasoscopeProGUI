@@ -525,7 +525,7 @@ class PlotsPanel(GraphicsLayoutWidget):
 
         plotted_at = time.time()
         f = int(1 / (plotted_at - self.last_plotted_at))
-        self.app.set_live_info_label(f"fps: {f}")
+        self.app.set_live_info_label(f"{f} fps")
         self.last_plotted_at = plotted_at
 
         if save_waveforms:
