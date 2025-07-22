@@ -1,86 +1,134 @@
+from PySide6.QtGui import QAction
+from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtWidgets import QToolBar, QLabel
-from pytide6 import PushButton
 
 from hspro.gui.app import App, WorkerMessage
+from hspro.gui.gui_ext.container import ValueContainer
 
 
 class MainToolBar(QToolBar):
     def __init__(self, app: App):
         super().__init__()
-        self.setStyleSheet("QToolBar{ padding: 3px 3px 3px 3px; spacing: 5px; }")
+        self.setStyleSheet("QToolBar{ padding: 3px 3px 3px 5px; spacing: 5px; }")
 
         self.addWidget(
-            QLabel("<b><h2 style=\"color: blue;\">Haasoscope<em style=\"color: red;\">Pro</em>&nbsp;&nbsp;</h2></b>"))
+            QLabel("<b><h1 style=\"color: blue;\">Haasoscope<em style=\"color: red;\">Pro</em>&nbsp;&nbsp;</h1></b>"))
 
         self.current_selection = None
         self.buttons = []
 
-        def mk_selector(b: PushButton):
-            def select():
-                if app.current_active_tool == b.text():
-                    # deactivate this tool
-                    app.current_active_tool = None
-                    b.setStyleSheet("background-color: #ffffff; color: black;")
-                else:
-                    for btn in self.buttons:
-                        if btn is b:
-                            btn.setStyleSheet("background-color: #008800; color: white;")
-                            app.current_active_tool = b.text()
-                        else:
-                            btn.setStyleSheet("background-color: #ffffff; color: black;")
+        icon_zoom = ValueContainer(app.icon_zoom_inactive_svg)
+        icon_zoom_hoover = ValueContainer(app.icon_zoom_inactive_hoover_svg)
+        icon_zoom_pressed = ValueContainer(app.icon_zoom_inactive_pressed_svg)
 
-            return select
+        zoom_button = QSvgWidget(None)
+        zoom_button.load(icon_zoom())
 
-        zoom_button = PushButton("Zoom", self)
-        zoom_button.clicked.connect(mk_selector(zoom_button))
+        zoom_button.setToolTip("Enable/Disable zoom operation")
+        zoom_button.setToolTipDuration(3000)
+
+        zoom_button.enterEvent = lambda _: zoom_button.load(icon_zoom_hoover())
+        zoom_button.leaveEvent = lambda _: zoom_button.load(icon_zoom())
+        zoom_button.mousePressEvent = lambda _: zoom_button.load(icon_zoom_pressed())
+
+        def toggle_zoom(_):
+            match app.current_active_tool:
+                case "Zoom":
+                    app.current_active_tool = ""
+                    icon_zoom.value = app.icon_zoom_inactive_svg
+                    icon_zoom_hoover.value = app.icon_zoom_inactive_hoover_svg
+                    icon_zoom_pressed.value = app.icon_zoom_inactive_pressed_svg
+                case _:
+                    app.current_active_tool = "Zoom"
+                    icon_zoom.value = app.icon_zoom_active_svg
+                    icon_zoom_hoover.value = app.icon_zoom_active_hoover_svg
+                    icon_zoom_pressed.value = app.icon_zoom_active_pressed_svg
+            zoom_button.load(icon_zoom_hoover())
+
+        zoom_button.mouseReleaseEvent = toggle_zoom
+
         self.buttons.append(zoom_button)
         self.addWidget(zoom_button)
 
-        add_label_button = PushButton("Add Label", self)
-        add_label_button.clicked.connect(mk_selector(add_label_button))
-        self.buttons.append(add_label_button)
-        self.addWidget(add_label_button)
-
-        add_v_marker_button = PushButton("Add Vertical Marker", self)
-        add_v_marker_button.clicked.connect(mk_selector(add_v_marker_button))
-        self.buttons.append(add_v_marker_button)
-        self.addWidget(add_v_marker_button)
-
-        add_h_marker_button = PushButton("Add Horizontal Marker", self)
-        add_h_marker_button.clicked.connect(mk_selector(add_h_marker_button))
-        self.buttons.append(add_h_marker_button)
-        self.addWidget(add_h_marker_button)
-
         self.addWidget(QLabel("        "))
 
-        take_snapshot_button = PushButton("Take scene snapshot", self)
-        take_snapshot_button.clicked.connect(app.record_state_in_scene)
+        take_snapshot_button = QSvgWidget(None)
+        take_snapshot_button.load(app.icon_snapshot_svg)
+        take_snapshot_button.enterEvent = lambda _: take_snapshot_button.load(app.icon_snapshot_hoover_svg)
+        take_snapshot_button.leaveEvent = lambda _: take_snapshot_button.load(app.icon_snapshot_svg)
+        take_snapshot_button.mousePressEvent = lambda _: take_snapshot_button.load(app.icon_snapshot_pressed_svg)
+
+        def releaseEvent(_):
+            take_snapshot_button.load(app.icon_snapshot_hoover_svg)
+            app.record_state_in_scene()
+
+        take_snapshot_button.mouseReleaseEvent = releaseEvent
+        take_snapshot_button.setToolTip("Take scene snapshot")
+        take_snapshot_button.setToolTipDuration(3000)
+
         self.addWidget(take_snapshot_button)
 
-        hold_release_button = PushButton("Hold", self)
-        hide_held_button = PushButton("Hide", self)
-        hide_held_button.setEnabled(False)
+        icon_hold_release = ValueContainer(app.icon_released_svg)
+        icon_hold_release_hoover = ValueContainer(app.icon_released_hoover_svg)
+        icon_hold_release_pressed = ValueContainer(app.icon_released_pressed_svg)
 
-        def toggle_hold_release():
-            if hold_release_button.text() == "Hold":
-                hold_release_button.setText("Release")
-                app.worker.messages.put(WorkerMessage.HoldWaveforms())
-                hide_held_button.setEnabled(True)
+        show_hide_button_action: ValueContainer[QAction] = ValueContainer(None)
+        icon_show_hide = ValueContainer(app.icon_shown_svg)
+        icon_show_hide_hoover = ValueContainer(app.icon_shown_hoover_svg)
+        icon_show_hide_pressed = ValueContainer(app.icon_shown_pressed_svg)
+
+        show_hide_button = QSvgWidget(None)
+        show_hide_button.setToolTip("Show/Hide held traces")
+        hold_release_button = QSvgWidget(None)
+        hold_release_button.setToolTip("Hold/Release traces")
+        hold_release_button.load(icon_hold_release())
+        hold_release_button.enterEvent = lambda _: hold_release_button.load(icon_hold_release_hoover())
+        hold_release_button.leaveEvent = lambda _: hold_release_button.load(icon_hold_release())
+        hold_release_button.mousePressEvent = lambda _: hold_release_button.load(icon_hold_release_pressed())
+
+        show_hide_button.load(icon_show_hide())
+        show_hide_button.enterEvent = lambda _: show_hide_button.load(icon_show_hide_hoover())
+        show_hide_button.mousePressEvent = lambda _: show_hide_button.load(icon_show_hide_pressed())
+
+        def toggle_show_hide(_):
+            if app.showing_holding_traces:
+                icon_show_hide.value = app.icon_hidden_svg
+                icon_show_hide_hoover.value = app.icon_hidden_hoover_svg
+                icon_show_hide_pressed.value = app.icon_hidden_pressed_svg
+                app.worker.messages.put(WorkerMessage.ShowHideHeldWaveforms(False))
+                app.showing_holding_traces = False
             else:
-                hold_release_button.setText("Hold")
-                app.worker.messages.put(WorkerMessage.ReleaseWaveforms())
-                hide_held_button.setEnabled(False)
+                icon_show_hide.value = app.icon_shown_svg
+                icon_show_hide_hoover.value = app.icon_shown_hoover_svg
+                icon_show_hide_pressed.value = app.icon_shown_pressed_svg
+                app.worker.messages.put(WorkerMessage.ShowHideHeldWaveforms(True))
+                app.showing_holding_traces = True
 
-        hold_release_button.clicked.connect(toggle_hold_release)
+            show_hide_button.load(icon_show_hide())
+
+        def toggle_hold_release(_):
+            if app.holding:
+                icon_hold_release.value = app.icon_released_svg
+                icon_hold_release_hoover.value = app.icon_released_hoover_svg
+                icon_hold_release_pressed.value = app.icon_released_pressed_svg
+                app.holding = False
+                app.worker.messages.put(WorkerMessage.ReleaseWaveforms())
+                show_hide_button_action().setVisible(False)
+            else:
+                icon_hold_release.value = app.icon_holding_svg
+                icon_hold_release_hoover.value = app.icon_holding_hoover_svg
+                icon_hold_release_pressed.value = app.icon_holding_pressed_svg
+                app.holding = True
+                app.worker.messages.put(WorkerMessage.HoldWaveforms())
+                if not app.showing_holding_traces:
+                    toggle_show_hide(None)
+                show_hide_button_action().setVisible(True)
+
+            hold_release_button.load(icon_hold_release_hoover())
+
+        hold_release_button.mouseReleaseEvent = toggle_hold_release
         self.addWidget(hold_release_button)
 
-        def toggle_hide_held():
-            if hide_held_button.text() == "Hide":
-                app.worker.messages.put(WorkerMessage.ShowHideHeldWaveforms(False))
-                hide_held_button.setText("Show")
-            else:
-                app.worker.messages.put(WorkerMessage.ShowHideHeldWaveforms(True))
-                hide_held_button.setText("Hide")
-
-        hide_held_button.clicked.connect(toggle_hide_held)
-        self.addWidget(hide_held_button)
+        show_hide_button.mouseReleaseEvent = toggle_show_hide
+        show_hide_button_action.value = self.addWidget(show_hide_button)
+        show_hide_button_action().setVisible(False)

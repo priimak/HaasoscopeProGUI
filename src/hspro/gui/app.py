@@ -88,6 +88,8 @@ class App:
     plot_color_scheme: str = "light"
     selected_channel: int | None = None
     current_active_tool = ""
+    holding = False
+    showing_holding_traces = True
 
     def __init__(self, screen_dim: tuple[int, int]):
         self.last_plotted_waveforms: list[Waveform] = []
@@ -96,6 +98,33 @@ class App:
         self.update_trigger_on_channel_label: Callable[[int], None] = lambda _: None
         self.waveforms_updated: Callable[[], None] = lambda: None
         self.set_channel_color_in_zoom_window: Callable[[int, str, bool], None] = lambda a, b, c: None
+
+        # load icons
+        icons_dir = Path(__file__).parent / "icons"
+        self.icon_zoom_inactive_svg = (icons_dir / "zoom.svg").read_bytes()
+        self.icon_zoom_inactive_hoover_svg = (icons_dir / "zoom-hoover.svg").read_bytes()
+        self.icon_zoom_inactive_pressed_svg = (icons_dir / "zoom-pressed.svg").read_bytes()
+        self.icon_zoom_active_svg = (icons_dir / "zoom-active.svg").read_bytes()
+        self.icon_zoom_active_hoover_svg = (icons_dir / "zoom-active-hoover.svg").read_bytes()
+        self.icon_zoom_active_pressed_svg = (icons_dir / "zoom-active-pressed.svg").read_bytes()
+
+        self.icon_snapshot_svg = (icons_dir / "snapshot.svg").read_bytes()
+        self.icon_snapshot_hoover_svg = (icons_dir / "snapshot-hoover.svg").read_bytes()
+        self.icon_snapshot_pressed_svg = (icons_dir / "snapshot-pressed.svg").read_bytes()
+
+        self.icon_holding_svg = (icons_dir / "holding.svg").read_bytes()
+        self.icon_holding_hoover_svg = (icons_dir / "holding-hoover.svg").read_bytes()
+        self.icon_holding_pressed_svg = (icons_dir / "holding-pressed.svg").read_bytes()
+        self.icon_released_svg = (icons_dir / "released.svg").read_bytes()
+        self.icon_released_hoover_svg = (icons_dir / "released-hoover.svg").read_bytes()
+        self.icon_released_pressed_svg = (icons_dir / "released-pressed.svg").read_bytes()
+
+        self.icon_shown_svg = (icons_dir / "shown.svg").read_bytes()
+        self.icon_shown_hoover_svg = (icons_dir / "shown-hoover.svg").read_bytes()
+        self.icon_shown_pressed_svg = (icons_dir / "shown-pressed.svg").read_bytes()
+        self.icon_hidden_svg = (icons_dir / "hidden.svg").read_bytes()
+        self.icon_hidden_hoover_svg = (icons_dir / "hidden-hoover.svg").read_bytes()
+        self.icon_hidden_pressed_svg = (icons_dir / "hidden-pressed.svg").read_bytes()
 
         self.scene = Scene("N/A", version=1, data=[])  # default scene
         self.scene_file: Path | None = None

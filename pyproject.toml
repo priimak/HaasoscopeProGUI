@@ -23,7 +23,7 @@ enabled = true
 where = ["src"]
 
 [tool.setuptools.package-data]
-"*" = ["*.png"]
+"*" = ["*.png", "*.svg"]
 
 [project.scripts]
 hspro = "hspro.gui.main:main"
