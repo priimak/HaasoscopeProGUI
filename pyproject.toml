@@ -8,7 +8,7 @@ dependencies = [
     "pyside6==6.9",
     "pyqtgraph==0.13.7",
     "unlib @ git+https://github.com/priimak/unlib.git@v0.2.2",
-    "pytide6 @ git+https://github.com/priimak/PyTide6.git@v0.6.0",
+    "pytide6 @ git+https://github.com/priimak/PyTide6.git@master",
     "HaasoscopeProPy @ git+https://github.com/priimak/HaasoscopeProPy.git@v0.1.1"
 ]
 

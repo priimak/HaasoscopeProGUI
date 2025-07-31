@@ -37,7 +37,6 @@ class HSProMainWindow(MainWindow):
         set_geometry(app_state=app_persistence.state, widget=self, screen_dim=screen_dim, win_size_fraction=0.7)
 
         self.menu_bar = self.setMenuBar(MainMenuBar(self.app))
-        self.addToolBar(MainToolBar(self.app))
 
         self.glw = PlotsPanel(self, self.app)
         self.app.set_plot_color_scheme = self.color_scheme
@@ -63,6 +62,7 @@ class HSProMainWindow(MainWindow):
         self.setCentralWidget(
             VBoxPanel(
                 widgets=[
+                    MainToolBar(self.app),
                     W(
                         HBoxPanel(widgets=[W(self.glw, stretch=1), controls_panel]), stretch=1
                     ),

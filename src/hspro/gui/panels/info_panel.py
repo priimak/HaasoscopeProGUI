@@ -3,6 +3,7 @@ import time
 from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import QHBoxLayout, QLabel
 from pytide6 import Panel, RichTextLabel
+from pytide6.palette import Palette
 
 from hspro.gui.app import App
 
@@ -26,9 +27,7 @@ class InfoPanel(Panel[QHBoxLayout]):
         self.last_info_label_update_time = time.time() - 1
         app.update_scene_data = lambda scene: self.scene_label.setText(f"Scene \"{scene.name}\" #{len(scene.data)}")
 
-        p = QPalette()
-        p.setColor(QPalette.ColorRole.Window, "white")
-        self.setPalette(p)
+        self.setPalette(Palette(QPalette.ColorRole.Window, "#fafafa"))
         self.setAutoFillBackground(True)
 
     def set_live_info_label(self, txt: str):

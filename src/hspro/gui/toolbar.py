@@ -1,18 +1,25 @@
 from PySide6.QtGui import QAction
+from PySide6.QtGui import QPalette
 from PySide6.QtSvgWidgets import QSvgWidget
-from PySide6.QtWidgets import QToolBar, QLabel
+from PySide6.QtWidgets import QHBoxLayout
+from PySide6.QtWidgets import QLabel
+from pytide6 import Panel
+from pytide6.palette import Palette
 
 from hspro.gui.app import App, WorkerMessage
 from hspro.gui.gui_ext.container import ValueContainer
 
 
-class MainToolBar(QToolBar):
+class MainToolBar(Panel[QHBoxLayout]):
     def __init__(self, app: App):
-        super().__init__()
-        self.setStyleSheet("QToolBar{ padding: 3px 3px 3px 5px; spacing: 5px; }")
+        super().__init__(QHBoxLayout())
+        self.setObjectName("MainToolBar")
+        self.setPalette(Palette(QPalette.ColorRole.Window, "#fafafa"))
+        self.setAutoFillBackground(True)
 
-        self.addWidget(
-            QLabel("<b><h1 style=\"color: blue;\">Haasoscope<em style=\"color: red;\">Pro</em>&nbsp;&nbsp;</h1></b>"))
+        self.addWidget(QLabel(
+            "<b><h1 style=\"color: blue;\">Haasoscope<em style=\"color: red;\">Pro</em>&nbsp;&nbsp;</h1></b>"
+        ))
 
         self.current_selection = None
         self.buttons = []
@@ -50,7 +57,7 @@ class MainToolBar(QToolBar):
         self.buttons.append(zoom_button)
         self.addWidget(zoom_button)
 
-        self.addWidget(QLabel("        "))
+        self.layout().addWidget(QLabel("        "))
 
         take_snapshot_button = QSvgWidget(None)
         take_snapshot_button.load(app.icon_snapshot_svg)
@@ -130,5 +137,8 @@ class MainToolBar(QToolBar):
         self.addWidget(hold_release_button)
 
         show_hide_button.mouseReleaseEvent = toggle_show_hide
-        show_hide_button_action.value = self.addWidget(show_hide_button)
+        self.addWidget(show_hide_button)
+        show_hide_button_action.value = show_hide_button
         show_hide_button_action().setVisible(False)
+
+        self.layout().addWidget(QLabel(""), stretch=10)
