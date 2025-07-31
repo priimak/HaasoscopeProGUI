@@ -12,6 +12,7 @@ from PySide6.QtGui import QPalette, QPen, Qt
 from PySide6.QtWidgets import QMessageBox, QFileDialog
 from hspro_api import TriggerType, WaveformAvailable, Waveform
 from pytide6 import MainWindow
+from pytide6.palette import Palette
 from sprats.config import AppPersistence
 from unlib import Duration
 
@@ -264,9 +265,7 @@ class App:
 
     @cache
     def side_pannels_palette(self):
-        palette = QPalette()
-        palette.setColor(QPalette.ColorRole.Window, "#90e0ef")
-        return palette
+        return Palette(QPalette.ColorRole.Window, "#90e0ef")
 
     @cache
     def trigger_lines_pen_default(self) -> QPen:

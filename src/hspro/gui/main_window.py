@@ -4,6 +4,7 @@ from PySide6.QtWidgets import QScrollArea, QMessageBox, QProgressDialog, QProgre
 from hspro_api.board import mk_board
 from hspro_api.conn.connection import Connection
 from pytide6 import MainWindow, set_geometry, VBoxPanel, W, HBoxPanel, Label
+from pytide6.palette import Palette
 from sprats.config import AppPersistence
 
 from hspro.gui.app import App, WorkerMessage
@@ -111,14 +112,12 @@ class HSProMainWindow(MainWindow):
         self.channels_panel.set_color_scheme(color_scheme)
         match color_scheme:
             case "light":
-                palette = QPalette()
-                palette.setColor(QPalette.ColorRole.Window, "white")
+                palette = Palette(QPalette.ColorRole.Window, "white")
                 self.top_controls_panel.setPalette(palette)
                 self.right_panel.setPalette(palette)
 
             case "dark":
-                palette = QPalette()
-                palette.setColor(QPalette.ColorRole.Window, "black")
+                palette = Palette(QPalette.ColorRole.Window, "black")
                 self.top_controls_panel.setPalette(palette)
                 self.right_panel.setPalette(palette)
 

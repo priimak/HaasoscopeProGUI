@@ -4,6 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPalette, QMouseEvent, QColor
 from PySide6.QtWidgets import QSpacerItem, QColorDialog
 from pytide6 import VBoxPanel, CheckBox, ComboBox, Label, HBoxPanel, W
+from pytide6.palette import Palette
 from unlib import MetricValue, Scale
 
 from hspro.gui.app import App, WorkerMessage
@@ -128,9 +129,7 @@ class ChannelsPanel(VBoxPanel):
                         self.app.set_trigger_on_channel(ch)
                         return
 
-                    p = QPalette()
-                    p.setColor(QPalette.ColorRole.Window, "red")
-                    self.spws[ch].setPalette(p)
+                    self.spws[ch].setPalette(Palette(QPalette.ColorRole.Window, "red"))
 
                     for i, cp in enumerate(self.spws):
                         if i != ch:
@@ -326,13 +325,9 @@ class ChannelsPanel(VBoxPanel):
     def set_color_scheme(self, color_scheme: str):
         match color_scheme:
             case "light":
-                p = QPalette()
-                p.setColor(QPalette.ColorRole.Window, "white")
-                self.setPalette(p)
+                self.setPalette(Palette(QPalette.ColorRole.Window, "white"))
             case "dark":
-                p = QPalette()
-                p.setColor(QPalette.ColorRole.Window, "black")
-                self.setPalette(p)
+                self.setPalette(Palette(QPalette.ColorRole.Window, "black"))
 
     def deselect_channel(self, channel: int):
         self.spws[channel].setPalette(self.app.side_pannels_palette())
